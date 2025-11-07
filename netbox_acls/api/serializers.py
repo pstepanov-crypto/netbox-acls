@@ -3,6 +3,7 @@ Serializers control the translation of client data to and from Python objects,
 while Django itself handles the database abstraction.
 """
 
+from dcim.api.serializers import DeviceSerializer
 from django.contrib.contenttypes.models import ContentType
 from drf_spectacular.utils import extend_schema_field
 from ipam.api.serializers import PrefixSerializer
@@ -34,6 +35,10 @@ error_message_action_remark_source_prefix_set = "Action is set to remark, Source
 error_message_remark_without_action_remark = "CANNOT set remark unless action is set to remark."
 # Sets a standard error message for ACL rules no associated with an ACL of the same type.
 error_message_acl_type = "Provided parent Access List is not of right type."
+# Sets a standard error message for when both source_device and source_prefix are set.
+error_message_source_device_and_prefix = "Cannot set both Source Device and Source Prefix."
+# Sets a standard error message for when both destination_device and destination_prefix are set.
+error_message_destination_device_and_prefix = "Cannot set both Destination Device and Destination Prefix."
 
 
 class AccessListSerializer(NetBoxModelSerializer):
@@ -192,6 +197,13 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
         allow_null=True,
         default=None,
     )
+    # Добавлено: сериализатор для устройства-источника
+    source_device = DeviceSerializer(
+        nested=True,
+        required=False,
+        allow_null=True,
+        default=None,
+    )
 
     class Meta:
         """
@@ -208,6 +220,7 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
             "action",
             "remark",
             "source_prefix",
+            "source_device",  # Добавлено
             "description",
             "tags",
             "created",
@@ -221,8 +234,14 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
         Validate the ACLStandardRule django model's inputs before allowing it to update the instance:
           - Check if action set to remark, but no remark set.
           - Check if action set to remark, but source_prefix set.
+          - Check if both source_device and source_prefix are set.
         """
         error_message = {}
+
+        # Check if both source_device and source_prefix are set.
+        if data.get("source_device") and data.get("source_prefix"):
+            error_message["source_device"] = [error_message_source_device_and_prefix]
+            error_message["source_prefix"] = [error_message_source_device_and_prefix]
 
         if data.get("action") == "remark":
             # Check if action set to remark, but no remark set.
@@ -234,6 +253,11 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
             if data.get("source_prefix"):
                 error_message["source_prefix"] = [
                     error_message_action_remark_source_prefix_set,
+                ]
+            # Check if action set to remark, but source_device set.
+            if data.get("source_device"):
+                error_message["source_device"] = [
+                    "Action is set to remark, Source Device CANNOT be set.",
                 ]
 
         if error_message:
@@ -257,7 +281,21 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         allow_null=True,
         default=None,
     )
+    # Добавлено: сериализатор для устройства-источника
+    source_device = DeviceSerializer(
+        nested=True,
+        required=False,
+        allow_null=True,
+        default=None,
+    )
     destination_prefix = PrefixSerializer(
+        nested=True,
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    # Добавлено: сериализатор для устройства-назначения
+    destination_device = DeviceSerializer(
         nested=True,
         required=False,
         allow_null=True,
@@ -280,8 +318,10 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
             "remark",
             "protocol",
             "source_prefix",
+            "source_device",        # Добавлено
             "source_ports",
             "destination_prefix",
+            "destination_device",   # Добавлено
             "destination_ports",
             "description",
             "tags",
@@ -300,9 +340,20 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
           - Check if action set to remark, but destination_prefix set.
           - Check if action set to remark, but destination_ports set.
           - Check if action set to remark, but protocol set.
-          - Check if action set to remark, but protocol set.
+          - Check if both source_device and source_prefix are set.
+          - Check if both destination_device and destination_prefix are set.
         """
         error_message = {}
+
+        # Check if both source_device and source_prefix are set.
+        if data.get("source_device") and data.get("source_prefix"):
+            error_message["source_device"] = [error_message_source_device_and_prefix]
+            error_message["source_prefix"] = [error_message_source_device_and_prefix]
+
+        # Check if both destination_device and destination_prefix are set.
+        if data.get("destination_device") and data.get("destination_prefix"):
+            error_message["destination_device"] = [error_message_destination_device_and_prefix]
+            error_message["destination_prefix"] = [error_message_destination_device_and_prefix]
 
         if data.get("action") == "remark":
             # Check if action set to remark, but no remark set.
@@ -315,6 +366,11 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
                 error_message["source_prefix"] = [
                     error_message_action_remark_source_prefix_set,
                 ]
+            # Check if action set to remark, but source_device set.
+            if data.get("source_device"):
+                error_message["source_device"] = [
+                    "Action is set to remark, Source Device CANNOT be set.",
+                ]
             # Check if action set to remark, but source_ports set.
             if data.get("source_ports"):
                 error_message["source_ports"] = [
@@ -324,6 +380,11 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
             if data.get("destination_prefix"):
                 error_message["destination_prefix"] = [
                     "Action is set to remark, Destination Prefix CANNOT be set.",
+                ]
+            # Check if action set to remark, but destination_device set.
+            if data.get("destination_device"):
+                error_message["destination_device"] = [
+                    "Action is set to remark, Destination Device CANNOT be set.",
                 ]
             # Check if action set to remark, but destination_ports set.
             if data.get("destination_ports"):
