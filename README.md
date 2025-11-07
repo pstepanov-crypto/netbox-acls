@@ -91,9 +91,15 @@ sudo ./venv/bin/python3 netbox/manage.py migrate
 sudo ./venv/bin/python3 netbox/manage.py makemigrations netbox_acls
 sudo ./venv/bin/python3 netbox/manage.py migrate netbox_acls
 
+
+after
+
+DEBUG = False in - sudo nano /opt/netbox-4.4.0/netbox/netbox/configuration.py
+
+
+
 check:
 sudo ./venv/bin/python3 netbox/manage.py showmigrations netbox_acls
-
 ```
 
 ## Developing
