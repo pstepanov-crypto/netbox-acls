@@ -22,7 +22,7 @@ COL_HOST_ASSIGNMENT = """
     {% else %}
     <a href="{{ record.assigned_object.virtual_machine.get_absolute_url }}">{{ record.assigned_object.virtual_machine|placeholder }}</a>
     {% endif %}
- """
+"""
 
 
 class AccessListTable(NetBoxTable):
@@ -137,6 +137,12 @@ class ACLStandardRuleTable(NetBoxTable):
         linkify=True,
     )
     action = ChoiceFieldColumn()
+    # Добавлено: колонка для устройства-источника
+    source_device = tables.Column(
+        linkify=True,
+        verbose_name=_("Source Device"),
+        orderable=False,
+    )
     tags = columns.TagColumn(
         url_name="plugins:netbox_acls:aclstandardrule_list",
     )
@@ -153,6 +159,7 @@ class ACLStandardRuleTable(NetBoxTable):
             "tags",
             "description",
             "source_prefix",
+            "source_device",  # Добавлено
         )
         default_columns = (
             "access_list",
@@ -160,6 +167,7 @@ class ACLStandardRuleTable(NetBoxTable):
             "action",
             "remark",
             "source_prefix",
+            "source_device",  # Добавлено
             "tags",
         )
 
@@ -176,6 +184,18 @@ class ACLExtendedRuleTable(NetBoxTable):
         linkify=True,
     )
     action = ChoiceFieldColumn()
+    # Добавлено: колонка для устройства-источника
+    source_device = tables.Column(
+        linkify=True,
+        verbose_name=_("Source Device"),
+        orderable=False,
+    )
+    # Добавлено: колонка для устройства-назначения
+    destination_device = tables.Column(
+        linkify=True,
+        verbose_name=_("Destination Device"),
+        orderable=False,
+    )
     tags = columns.TagColumn(
         url_name="plugins:netbox_acls:aclextendedrule_list",
     )
@@ -193,8 +213,10 @@ class ACLExtendedRuleTable(NetBoxTable):
             "tags",
             "description",
             "source_prefix",
+            "source_device",        # Добавлено
             "source_ports",
             "destination_prefix",
+            "destination_device",   # Добавлено
             "destination_ports",
             "protocol",
         )
@@ -205,8 +227,10 @@ class ACLExtendedRuleTable(NetBoxTable):
             "remark",
             "tags",
             "source_prefix",
+            "source_device",        # Добавлено
             "source_ports",
-            "destination_prefix",
+            "destination_prefix", 
+            "destination_device",   # Добавлено
             "destination_ports",
             "protocol",
         )
