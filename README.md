@@ -55,7 +55,8 @@ For adding to a NetBox Docker setup see
 You can install with pip:
 
 ```bash
-pip install netbox-acls
+git clone https://github.com/pstepanov-crypto/netbox-acls.git plugins/netbox-acls
+pip install -e plugins/netbox-acls
 ```
 
 or by adding to your `local_requirements.txt` or `plugin_requirements.txt` (netbox-docker):
