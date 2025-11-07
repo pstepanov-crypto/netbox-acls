@@ -42,6 +42,10 @@ help_text_acl_rule_logic = mark_safe(
 help_text_acl_action = "Action the rule will take (remark, deny, or allow)."
 # Sets a standard help_text value to be used by the various classes for acl index
 help_text_acl_rule_index = "Determines the order of the rule in the ACL processing. AKA Sequence Number."
+# Sets a standard help_text value to be used for device fields
+help_text_acl_device_logic = mark_safe(
+    "<b>*Note:</b> CANNOT be set if corresponding prefix is set.",
+)
 
 
 class AccessListForm(NetBoxModelForm):
@@ -501,6 +505,16 @@ class ACLStandardRuleForm(NetBoxModelForm):
         help_text=help_text_acl_rule_logic,
         label="Source Prefix",
     )
+    # Добавлено: поле для устройства-источника
+    source_device = DynamicModelChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
+        help_text=help_text_acl_device_logic,
+        label="Source Device",
+        query_params={
+            'has_primary_ip': 'True',  # Только устройства с IP
+        }
+    )
 
     fieldsets = (
         FieldSet(
@@ -514,6 +528,7 @@ class ACLStandardRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
+            "source_device",  # Добавлено
             name=_("Rule Definition"),
         ),
     )
@@ -526,6 +541,7 @@ class ACLStandardRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
+            "source_device",  # Добавлено
             "tags",
             "description",
         )
@@ -536,7 +552,23 @@ class ACLStandardRuleForm(NetBoxModelForm):
             "remark": mark_safe(
                 "<b>*Note:</b> CANNOT be set if source prefix OR action is set.",
             ),
+            "source_device": help_text_acl_device_logic,
         }
+
+    def clean(self):
+        """
+        Validate that both source_device and source_prefix are not set at the same time.
+        """
+        super().clean()
+        
+        source_device = self.cleaned_data.get("source_device")
+        source_prefix = self.cleaned_data.get("source_prefix")
+        
+        if source_device and source_prefix:
+            raise ValidationError({
+                "source_device": "Cannot set both Source Device and Source Prefix.",
+                "source_prefix": "Cannot set both Source Device and Source Prefix."
+            })
 
 
 class ACLExtendedRuleForm(NetBoxModelForm):
@@ -563,12 +595,33 @@ class ACLExtendedRuleForm(NetBoxModelForm):
         help_text=help_text_acl_rule_logic,
         label="Source Prefix",
     )
+    # Добавлено: поле для устройства-источника
+    source_device = DynamicModelChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
+        help_text=help_text_acl_device_logic,
+        label="Source Device",
+        query_params={
+            'has_primary_ip': 'True',  # Только устройства с IP
+        }
+    )
     destination_prefix = DynamicModelChoiceField(
         queryset=Prefix.objects.all(),
         required=False,
         help_text=help_text_acl_rule_logic,
         label="Destination Prefix",
     )
+    # Добавлено: поле для устройства-назначения
+    destination_device = DynamicModelChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
+        help_text=help_text_acl_device_logic,
+        label="Destination Device",
+        query_params={
+            'has_primary_ip': 'True',  # Только устройства с IP
+        }
+    )
+
     fieldsets = (
         FieldSet(
             "access_list",
@@ -581,8 +634,10 @@ class ACLExtendedRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
+            "source_device",        # Добавлено
             "source_ports",
             "destination_prefix",
+            "destination_device",   # Добавлено
             "destination_ports",
             "protocol",
             name=_("Rule Definition"),
@@ -597,8 +652,10 @@ class ACLExtendedRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
+            "source_device",        # Добавлено
             "source_ports",
             "destination_prefix",
+            "destination_device",   # Добавлено
             "destination_ports",
             "protocol",
             "tags",
@@ -614,4 +671,31 @@ class ACLExtendedRuleForm(NetBoxModelForm):
                 "<b>*Note:</b> CANNOT be set if action is not set to remark.",
             ),
             "source_ports": help_text_acl_rule_logic,
+            "source_device": help_text_acl_device_logic,
+            "destination_device": help_text_acl_device_logic,
         }
+
+    def clean(self):
+        """
+        Validate that both source_device/source_prefix and destination_device/destination_prefix 
+        are not set at the same time.
+        """
+        super().clean()
+        
+        source_device = self.cleaned_data.get("source_device")
+        source_prefix = self.cleaned_data.get("source_prefix")
+        destination_device = self.cleaned_data.get("destination_device")
+        destination_prefix = self.cleaned_data.get("destination_prefix")
+        
+        errors = {}
+        
+        if source_device and source_prefix:
+            errors["source_device"] = "Cannot set both Source Device and Source Prefix."
+            errors["source_prefix"] = "Cannot set both Source Device and Source Prefix."
+            
+        if destination_device and destination_prefix:
+            errors["destination_device"] = "Cannot set both Destination Device and Destination Prefix."
+            errors["destination_prefix"] = "Cannot set both Destination Device and Destination Prefix."
+            
+        if errors:
+            raise ValidationError(errors)
