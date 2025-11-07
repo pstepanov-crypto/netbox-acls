@@ -215,6 +215,18 @@ class ACLStandardRuleFilterSet(NetBoxModelFilterSet):
         to_field_name="id",
         label=_("Source Prefix (ID)"),
     )
+    # Добавлено: фильтры для устройства-источника
+    source_device = django_filters.ModelMultipleChoiceFilter(
+        field_name="source_device__name",
+        queryset=Device.objects.all(),
+        to_field_name="name",
+        label=_("Source Device (name)"),
+    )
+    source_device_id = django_filters.ModelMultipleChoiceFilter(
+        field_name="source_device",
+        queryset=Device.objects.all(),
+        label=_("Source Device (ID)"),
+    )
 
     class Meta:
         """
@@ -222,7 +234,7 @@ class ACLStandardRuleFilterSet(NetBoxModelFilterSet):
         """
 
         model = ACLStandardRule
-        fields = ("id", "access_list", "index", "action")
+        fields = ("id", "access_list", "index", "action", "source_device", "source_device_id")
 
     def search(self, queryset, name, value):
         """
@@ -232,6 +244,7 @@ class ACLStandardRuleFilterSet(NetBoxModelFilterSet):
             Q(access_list__name__icontains=value)
             | Q(index__icontains=value)
             | Q(action__icontains=value)
+            | Q(source_device__name__icontains=value)  # Добавлено
         )
         return queryset.filter(query)
 
@@ -266,6 +279,18 @@ class ACLExtendedRuleFilterSet(NetBoxModelFilterSet):
         to_field_name="id",
         label=_("Source Prefix (ID)"),
     )
+    # Добавлено: фильтры для устройства-источника
+    source_device = django_filters.ModelMultipleChoiceFilter(
+        field_name="source_device__name",
+        queryset=Device.objects.all(),
+        to_field_name="name",
+        label=_("Source Device (name)"),
+    )
+    source_device_id = django_filters.ModelMultipleChoiceFilter(
+        field_name="source_device",
+        queryset=Device.objects.all(),
+        label=_("Source Device (ID)"),
+    )
 
     # Destination
     destination_prefix = django_filters.ModelMultipleChoiceFilter(
@@ -280,6 +305,18 @@ class ACLExtendedRuleFilterSet(NetBoxModelFilterSet):
         to_field_name="id",
         label=_("Destination Prefix (ID)"),
     )
+    # Добавлено: фильтры для устройства-назначения
+    destination_device = django_filters.ModelMultipleChoiceFilter(
+        field_name="destination_device__name",
+        queryset=Device.objects.all(),
+        to_field_name="name",
+        label=_("Destination Device (name)"),
+    )
+    destination_device_id = django_filters.ModelMultipleChoiceFilter(
+        field_name="destination_device",
+        queryset=Device.objects.all(),
+        label=_("Destination Device (ID)"),
+    )
 
     class Meta:
         """
@@ -287,7 +324,17 @@ class ACLExtendedRuleFilterSet(NetBoxModelFilterSet):
         """
 
         model = ACLExtendedRule
-        fields = ("id", "access_list", "index", "action", "protocol")
+        fields = (
+            "id", 
+            "access_list", 
+            "index", 
+            "action", 
+            "protocol",
+            "source_device", 
+            "source_device_id",
+            "destination_device", 
+            "destination_device_id"
+        )
 
     def search(self, queryset, name, value):
         """
@@ -298,5 +345,7 @@ class ACLExtendedRuleFilterSet(NetBoxModelFilterSet):
             | Q(index__icontains=value)
             | Q(action__icontains=value)
             | Q(protocol__icontains=value)
+            | Q(source_device__name__icontains=value)      # Добавлено
+            | Q(destination_device__name__icontains=value) # Добавлено
         )
         return queryset.filter(query)
