@@ -86,12 +86,12 @@ To add the required `netbox-acls` tables to your NetBox database, run the `migra
 ```
 cd /opt/netbox
 sudo ./venv/bin/python3 netbox/manage.py migrate
+sudo ./venv/bin/python3 netbox/manage.py makemigrations netbox_acls
+sudo ./venv/bin/python3 netbox/manage.py migrate netbox_acls
 
-or
+check:
+sudo ./venv/bin/python3 netbox/manage.py showmigrations netbox_acls
 
-cd /opt/netbox-4.4.0/netbox
-python3 manage.py makemigrations netbox-acls
-python3 manage.py migrate netbox-acls
 ```
 
 ## Developing
