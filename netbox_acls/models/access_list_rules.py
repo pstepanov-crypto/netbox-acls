@@ -41,6 +41,12 @@ ERROR_MESSAGE_ACTION_REMARK_PROTOCOL_SET = _("When the action is 'remark', Proto
 # Error message when a remark is provided, but the action is not set to 'remark'.
 ERROR_MESSAGE_REMARK_WITHOUT_ACTION_REMARK = _("A remark cannot be set unless the action is 'remark'.")
 
+# Error message when both source_device and source_prefix are set.
+ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX = _("Cannot set both Source Device and Source Prefix.")
+
+# Error message when both destination_device and destination_prefix are set.
+ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX = _("Cannot set both Destination Device and Destination Prefix.")
+
 
 class ACLRule(NetBoxModel):
     """
@@ -78,8 +84,17 @@ class ACLRule(NetBoxModel):
         blank=True,
         null=True,
     )
+    # Добавлено: поле для устройства-источника
+    source_device = models.ForeignKey(
+        to="dcim.Device",
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name=_("Source Device"),
+        blank=True,
+        null=True,
+    )
 
-    clone_fields = ("access_list", "action", "source_prefix")
+    clone_fields = ("access_list", "action", "source_prefix", "source_device")
     prerequisite_models = ("netbox_acls.AccessList",)
 
     class Meta:
@@ -109,6 +124,21 @@ class ACLRule(NetBoxModel):
 
     def get_action_color(self):
         return ACLRuleActionChoices.colors.get(self.action)
+
+    def clean(self):
+        """
+        Validate common ACL Rule inputs for both standard and extended rules.
+        """
+        super().clean()
+        errors = {}
+
+        # Validate that both source_device and source_prefix are not set at the same time
+        if self.source_device and self.source_prefix:
+            errors["source_device"] = ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX
+            errors["source_prefix"] = ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX
+
+        if errors:
+            raise ValidationError(errors)
 
 
 class ACLStandardRule(ACLRule):
@@ -153,6 +183,8 @@ class ACLStandardRule(ACLRule):
                 errors["remark"] = ERROR_MESSAGE_NO_REMARK
             if self.source_prefix:
                 errors["source_prefix"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_PREFIX_SET
+            if self.source_device:
+                errors["source_device"] = _("When the action is 'remark', Source Device must not be set.")
         # Validate that the action is "remark", when the remark field is provided
         elif self.remark:
             errors["remark"] = ERROR_MESSAGE_REMARK_WITHOUT_ACTION_REMARK
@@ -188,6 +220,15 @@ class ACLExtendedRule(ACLRule):
         blank=True,
         null=True,
     )
+    # Добавлено: поле для устройства-назначения
+    destination_device = models.ForeignKey(
+        to="dcim.Device",
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name=_("Destination Device"),
+        blank=True,
+        null=True,
+    )
     destination_ports = ArrayField(
         base_field=models.PositiveIntegerField(),
         verbose_name=_("Destination Ports"),
@@ -205,8 +246,10 @@ class ACLExtendedRule(ACLRule):
         "access_list",
         "action",
         "source_prefix",
+        "source_device",
         "source_ports",
         "destination_prefix",
+        "destination_device",
         "destination_ports",
         "protocol",
     )
@@ -239,16 +282,25 @@ class ACLExtendedRule(ACLRule):
         super().clean()
         errors = {}
 
+        # Validate that both destination_device and destination_prefix are not set at the same time
+        if self.destination_device and self.destination_prefix:
+            errors["destination_device"] = ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX
+            errors["destination_prefix"] = ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX
+
         # Validate that only the remark field is filled
         if self.action == ACLRuleActionChoices.ACTION_REMARK:
             if not self.remark:
                 errors["remark"] = ERROR_MESSAGE_NO_REMARK
             if self.source_prefix:
                 errors["source_prefix"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_PREFIX_SET
+            if self.source_device:
+                errors["source_device"] = _("When the action is 'remark', Source Device must not be set.")
             if self.source_ports:
                 errors["source_ports"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_PORTS_SET
             if self.destination_prefix:
                 errors["destination_prefix"] = ERROR_MESSAGE_ACTION_REMARK_DESTINATION_PREFIX_SET
+            if self.destination_device:
+                errors["destination_device"] = _("When the action is 'remark', Destination Device must not be set.")
             if self.destination_ports:
                 errors["destination_ports"] = ERROR_MESSAGE_ACTION_REMARK_DESTINATION_PORTS_SET
             if self.protocol:
