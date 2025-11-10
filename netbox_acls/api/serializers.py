@@ -204,6 +204,12 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
         allow_null=True,
         default=None,
     )
+    # Добавлено: IP-адрес устройства-источника
+    source_device_ip = serializers.SerializerMethodField(
+        required=False,
+        allow_null=True,
+        read_only=True,
+    )
 
     class Meta:
         """
@@ -221,6 +227,7 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
             "remark",
             "source_prefix",
             "source_device",  # Добавлено
+            "source_device_ip",  # Добавлено
             "description",
             "tags",
             "created",
@@ -228,6 +235,15 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "access_list", "index")
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_source_device_ip(self, obj):
+        """
+        Returns the primary IP address of the source device.
+        """
+        if obj.source_device and obj.source_device.primary_ip:
+            return str(obj.source_device.primary_ip.address.ip)
+        return None
 
     def validate(self, data):
         """
@@ -288,6 +304,12 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         allow_null=True,
         default=None,
     )
+    # Добавлено: IP-адрес устройства-источника
+    source_device_ip = serializers.SerializerMethodField(
+        required=False,
+        allow_null=True,
+        read_only=True,
+    )
     destination_prefix = PrefixSerializer(
         nested=True,
         required=False,
@@ -300,6 +322,12 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         required=False,
         allow_null=True,
         default=None,
+    )
+    # Добавлено: IP-адрес устройства-назначения
+    destination_device_ip = serializers.SerializerMethodField(
+        required=False,
+        allow_null=True,
+        read_only=True,
     )
 
     class Meta:
@@ -319,9 +347,11 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
             "protocol",
             "source_prefix",
             "source_device",        # Добавлено
+            "source_device_ip",     # Добавлено
             "source_ports",
             "destination_prefix",
             "destination_device",   # Добавлено
+            "destination_device_ip", # Добавлено
             "destination_ports",
             "description",
             "tags",
@@ -330,6 +360,24 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
             "last_updated",
         )
         brief_fields = ("id", "url", "display", "access_list", "index")
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_source_device_ip(self, obj):
+        """
+        Returns the primary IP address of the source device.
+        """
+        if obj.source_device and obj.source_device.primary_ip:
+            return str(obj.source_device.primary_ip.address.ip)
+        return None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_destination_device_ip(self, obj):
+        """
+        Returns the primary IP address of the destination device.
+        """
+        if obj.destination_device and obj.destination_device.primary_ip:
+            return str(obj.destination_device.primary_ip.address.ip)
+        return None
 
     def validate(self, data):
         """
