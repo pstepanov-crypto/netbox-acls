@@ -54,6 +54,8 @@ class AccessListSerializer(NetBoxModelSerializer):
         queryset=ContentType.objects.filter(ACL_HOST_ASSIGNMENT_MODELS),
     )
     assigned_object = serializers.SerializerMethodField(read_only=True)
+    # Добавлено: IP-адрес хоста, к которому привязан ACL
+    host_ip = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         """
@@ -69,6 +71,7 @@ class AccessListSerializer(NetBoxModelSerializer):
             "assigned_object_type",
             "assigned_object_id",
             "assigned_object",
+            "host_ip",  # Добавлено
             "type",
             "default_action",
             "comments",
@@ -87,6 +90,20 @@ class AccessListSerializer(NetBoxModelSerializer):
         serializer = get_serializer_for_model(obj.assigned_object)
         context = {"request": self.context["request"]}
         return serializer(obj.assigned_object, nested=True, context=context).data
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_host_ip(self, obj):
+        """
+        Returns the primary IP address of the host device/vm that the ACL is assigned to.
+        """
+        if obj.assigned_object is None:
+            return None
+            
+        # Для Device и VirtualMachine
+        if hasattr(obj.assigned_object, 'primary_ip') and obj.assigned_object.primary_ip:
+            return str(obj.assigned_object.primary_ip.address.ip)
+            
+        return None
 
     def validate(self, data):
         """
