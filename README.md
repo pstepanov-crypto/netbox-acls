@@ -104,8 +104,9 @@ To add the required `netbox-acls` tables to your NetBox database, run the `migra
 
 cd /opt/netbox
 sudo ./venv/bin/python3 netbox/manage.py migrate
+- update добавил файл migrations/0005_add_device_fields.py в проэкт не тестил еще, но возможно миграция в ручную большне не понадобится
 
-или миграция ручная, по другому у меня не сработало
+или миграция ручная, по другому у меня не сработало 
 
 DEBUG = True in - sudo nano /opt/netbox-4.4.0/netbox/netbox/configuration.py
 
