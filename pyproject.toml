@@ -31,7 +31,7 @@ reportMissingTypeStubs = false
 line-length = 140
 
 [project]
-name = "netbox-acls"
+name = "netbox-acls-pstepanov"
 version = "1.9.1"
 readme = "README.md"
 requires-python = ">=3.10.0"
@@ -54,6 +54,6 @@ license = {file = "LICENSE.txt"}
 
 
 [project.urls]
-Documentation = "https://github.com/netbox-community/netbox-acls/blob/dev/README.md"
-Source = "https://github.com/netbox-community/netbox-acls/"
-Tracker = "https://github.com/netbox-community/netbox-acls/issues"
+Documentation = "https://github.com/pstepanov-crypto/netbox-acls/blob/main/README.md"
+Source = "https://github.com/pstepanov-crypto/netbox-acls/"
+Tracker = "https://github.com/pstepanov-crypto/netbox-acls/issues"
