@@ -59,12 +59,6 @@ git clone https://github.com/pstepanov-crypto/netbox-acls.git plugins/netbox-acl
 pip install -e plugins/netbox-acls
 ```
 
-or by adding to your `local_requirements.txt` or `plugin_requirements.txt` (netbox-docker):
-
-```bash
-netbox-acls
-```
-
 ## Configuration
 
 Enable the plugin in `/opt/netbox/netbox/netbox/configuration.py`,
