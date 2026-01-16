@@ -31,7 +31,7 @@ reportMissingTypeStubs = false
 line-length = 140
 
 [project]
-name = "netbox-acls-pstepanov"
+name = "netbox-acls"
 version = "1.9.1"
 readme = "README.md"
 requires-python = ">=3.10.0"
