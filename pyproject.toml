@@ -50,7 +50,7 @@ classifiers=[
     'Topic :: Internet',
 ]
 keywords = ["netbox", "netbox-plugin"]
-license = {file = "LICENSE.txt"}
+
 
 
 [project.urls]
