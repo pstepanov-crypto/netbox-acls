@@ -55,13 +55,31 @@ For adding to a NetBox Docker setup see
 You can install with pip:
 
 ```bash
+# Создайте структуру каталогов
+sudo mkdir -p /opt/netbox/plugins/netbox-acls
+sudo chown -R $(whoami):netbox /opt/netbox/plugins
+sudo chmod -R 775 /opt/netbox/plugins
+
+cd /opt/netbox/plugins
+git clone https://github.com/pstepanov-crypto/netbox-acls.git
+
+# Дайте права
+sudo chown -R $(whoami):netbox netbox-acls
+sudo chmod -R 775 netbox-acls
+
+# Дайте права пользователю netbox на venv
+sudo chown -R netbox:netbox /opt/netbox/venv
+sudo chmod -R 755 /opt/netbox/venv
+
+# Дайте права на запись в site-packages
+sudo chmod -R 777 /opt/netbox/venv/lib/python3.11/site-packages/
+
+
 cd /opt/netbox
 source venv/bin/activate
-sudo pip install git+https://github.com/pstepanov-crypto/netbox-acls.git
-cd /opt/netbox/netbox
-sudo python3 manage.py migrate
-deactivate
-sudo systemctl restart netbox netbox-rq
+cd /opt/netbox/plugins/netbox-acls
+pip install -e .
+
 ```
 
 ## Configuration
