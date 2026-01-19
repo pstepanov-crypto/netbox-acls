@@ -1,7 +1,7 @@
 # NetBox Access Lists Plugin
 + added host to host ACL (FORK)
 + change type of source/destination ports (ability to create range ports, and etc.)
-+ original [Netbox](https://github.com/netbox-community/netbox) plugin for Access List management.
+
 
 ## Features
 
