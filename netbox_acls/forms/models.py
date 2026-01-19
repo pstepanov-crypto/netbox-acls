@@ -46,6 +46,8 @@ help_text_acl_rule_index = "Determines the order of the rule in the ACL processi
 help_text_acl_device_logic = mark_safe(
     "<b>*Note:</b> CANNOT be set if corresponding prefix is set.",
 )
+# Sets a standard help_text value to be used for port fields
+help_text_acl_ports = "Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"
 
 
 class AccessListForm(NetBoxModelForm):
@@ -605,6 +607,13 @@ class ACLExtendedRuleForm(NetBoxModelForm):
             'has_primary_ip': 'True',  # Только устройства с IP
         }
     )
+    # ИЗМЕНЕНО: CharField вместо ArrayField для поддержки диапазонов
+    source_ports = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Source Ports",
+        help_text=help_text_acl_ports,
+    )
     destination_prefix = DynamicModelChoiceField(
         queryset=Prefix.objects.all(),
         required=False,
@@ -620,6 +629,13 @@ class ACLExtendedRuleForm(NetBoxModelForm):
         query_params={
             'has_primary_ip': 'True',  # Только устройства с IP
         }
+    )
+    # ИЗМЕНЕНО: CharField вместо ArrayField для поддержки диапазонов
+    destination_ports = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Destination Ports",
+        help_text=help_text_acl_ports,
     )
 
     fieldsets = (
