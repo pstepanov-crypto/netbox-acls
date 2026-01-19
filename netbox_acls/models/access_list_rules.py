@@ -206,11 +206,10 @@ class ACLExtendedRule(ACLRule):
         limit_choices_to={"type": "extended"},
         verbose_name=_("Extended Access List"),
     )
-    source_ports = ArrayField(
-        base_field=models.PositiveIntegerField(),
+    source_ports = models.CharField(
         verbose_name=_("Source Ports"),
+        max_length=100,
         blank=True,
-        null=True,
     )
     destination_prefix = models.ForeignKey(
         to="ipam.prefix",
@@ -229,11 +228,10 @@ class ACLExtendedRule(ACLRule):
         blank=True,
         null=True,
     )
-    destination_ports = ArrayField(
-        base_field=models.PositiveIntegerField(),
+    destination_ports = models.CharField(
         verbose_name=_("Destination Ports"),
+        max_length=100,
         blank=True,
-        null=True,
     )
     protocol = models.CharField(
         verbose_name=_("Protocol"),
