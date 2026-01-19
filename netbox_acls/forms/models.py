@@ -3,6 +3,7 @@ Defines each django model's GUI form to add or edit objects for each django mode
 """
 
 from dcim.models import Device, Interface, Region, Site, SiteGroup, VirtualChassis
+from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.utils.safestring import mark_safe
