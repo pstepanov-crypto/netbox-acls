@@ -328,6 +328,13 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         allow_null=True,
         read_only=True,
     )
+    # ИЗМЕНЕНО: CharField вместо ListField для поддержки диапазонов
+    source_ports = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=100,
+        help_text="Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)",
+    )
     destination_prefix = PrefixSerializer(
         nested=True,
         required=False,
@@ -346,6 +353,13 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         required=False,
         allow_null=True,
         read_only=True,
+    )
+    # ИЗМЕНЕНО: CharField вместо ListField для поддержки диапазонов
+    destination_ports = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=100,
+        help_text="Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)",
     )
 
     class Meta:
