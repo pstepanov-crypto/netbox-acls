@@ -2,18 +2,14 @@
 Define the django models for this plugin.
 """
 
-from django.apps import apps
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from ipam.models import Aggregate, IPAddress, IPRange, Prefix
 from netbox.models import NetBoxModel
 
 from ..choices import ACLProtocolChoices, ACLRuleActionChoices, ACLTypeChoices
-from ..constants import ACL_RULE_SOURCE_DESTINATION_MODELS
 from .access_lists import AccessList
 
 __all__ = (
@@ -25,14 +21,16 @@ __all__ = (
 # Error message when the action is 'remark', but no remark is provided.
 ERROR_MESSAGE_NO_REMARK = _("When the action is 'remark', a remark is required.")
 
-# Error message when the action is 'remark', but the source is set.
-ERROR_MESSAGE_ACTION_REMARK_SOURCE_SET = _("When the action is 'remark', the Source must not be set.")
+# Error message when the action is 'remark', but the source_prefix is set.
+ERROR_MESSAGE_ACTION_REMARK_SOURCE_PREFIX_SET = _("When the action is 'remark', the Source Prefix must not be set.")
 
 # Error message when the action is 'remark', but the source_ports are set.
 ERROR_MESSAGE_ACTION_REMARK_SOURCE_PORTS_SET = _("When the action is 'remark', Source Ports must not be set.")
 
-# Error message when the action is 'remark', but the destination is set.
-ERROR_MESSAGE_ACTION_REMARK_DESTINATION_SET = _("When the action is 'remark', the Destination must not be set.")
+# Error message when the action is 'remark', but the destination_prefix is set.
+ERROR_MESSAGE_ACTION_REMARK_DESTINATION_PREFIX_SET = _(
+    "When the action is 'remark', the Destination Prefix must not be set."
+)
 
 # Error message when the action is 'remark', but the destination_ports are set.
 ERROR_MESSAGE_ACTION_REMARK_DESTINATION_PORTS_SET = _("When the action is 'remark', Destination Ports must not be set.")
@@ -42,6 +40,12 @@ ERROR_MESSAGE_ACTION_REMARK_PROTOCOL_SET = _("When the action is 'remark', Proto
 
 # Error message when a remark is provided, but the action is not set to 'remark'.
 ERROR_MESSAGE_REMARK_WITHOUT_ACTION_REMARK = _("A remark cannot be set unless the action is 'remark'.")
+
+# Error message when both source_device and source_prefix are set.
+ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX = _("Cannot set both Source Device and Source Prefix.")
+
+# Error message when both destination_device and destination_prefix are set.
+ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX = _("Cannot set both Destination Device and Destination Prefix.")
 
 
 class ACLRule(NetBoxModel):
@@ -56,9 +60,12 @@ class ACLRule(NetBoxModel):
         related_name="rules",
         verbose_name=_("Access List"),
     )
-
-    # Rule
     index = models.PositiveIntegerField()
+    remark = models.CharField(
+        verbose_name=_("Remark"),
+        max_length=500,
+        blank=True,
+    )
     description = models.CharField(
         verbose_name=_("Description"),
         max_length=500,
@@ -69,75 +76,26 @@ class ACLRule(NetBoxModel):
         max_length=30,
         choices=ACLRuleActionChoices,
     )
-
-    # Remark
-    remark = models.CharField(
-        verbose_name=_("Remark"),
-        max_length=500,
-        blank=True,
-    )
-
-    # Source
-    source_type = models.ForeignKey(
-        to="contenttypes.ContentType",
-        on_delete=models.PROTECT,
-        related_name="+",
-        limit_choices_to=ACL_RULE_SOURCE_DESTINATION_MODELS,
-        verbose_name=_("Source Type"),
-        blank=True,
-        null=True,
-    )
-    source_id = models.PositiveBigIntegerField(
-        verbose_name=_("Source ID"),
-        blank=True,
-        null=True,
-    )
-    source = GenericForeignKey(
-        ct_field="source_type",
-        fk_field="source_id",
-    )
-
-    # Cached related objects by association name for faster access
-    _source_aggregate = models.ForeignKey(
-        to="ipam.aggregate",
-        on_delete=models.PROTECT,
-        related_name="_%(class)s_sources",
-        verbose_name=_("Source Aggregate"),
-        blank=True,
-        null=True,
-    )
-    _source_ipaddress = models.ForeignKey(
-        to="ipam.ipaddress",
-        on_delete=models.PROTECT,
-        related_name="_%(class)s_sources",
-        verbose_name=_("Source IP-Address"),
-        blank=True,
-        null=True,
-    )
-    _source_iprange = models.ForeignKey(
-        to="ipam.iprange",
-        on_delete=models.PROTECT,
-        related_name="_%(class)s_sources",
-        verbose_name=_("Source IP-Range"),
-        blank=True,
-        null=True,
-    )
-    _source_prefix = models.ForeignKey(
+    source_prefix = models.ForeignKey(
         to="ipam.prefix",
         on_delete=models.PROTECT,
-        related_name="_%(class)s_sources",
+        related_name="+",
         verbose_name=_("Source Prefix"),
         blank=True,
         null=True,
     )
-
-    clone_fields = (
-        "access_list",
-        "action",
-        "source_id",
-        "source_type",
+    # Добавлено: поле для устройства-источника
+    source_device = models.ForeignKey(
+        to="dcim.Device",
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name=_("Source Device"),
+        blank=True,
+        null=True,
     )
-    prerequisite_models: tuple = ("netbox_acls.AccessList",)
+
+    clone_fields = ("access_list", "action", "source_prefix", "source_device")
+    prerequisite_models = ("netbox_acls.AccessList",)
 
     class Meta:
         """
@@ -148,55 +106,11 @@ class ACLRule(NetBoxModel):
         """
 
         abstract = True
-        indexes = (models.Index(fields=("source_type", "source_id")),)
         ordering = ["access_list", "index"]
         unique_together = ["access_list", "index"]
 
     def __str__(self):
         return f"{self.access_list}: Rule {self.index}"
-
-    def clean(self):
-        """
-        Override the model's clean method for custom field validation.
-        """
-        # Validate source assignment
-        if self.source_type and not (self.source or self.source_id):
-            source_type = self.source_type.model_class()
-            raise ValidationError(
-                {
-                    "source": _("Please select a source {source_type}.").format(
-                        source_type=source_type._meta.verbose_name
-                    )
-                }
-            )
-        super().clean()
-
-    def save(self, *args, **kwargs):
-        """
-        Saves the current instance to the database.
-        """
-        # Cache the related source objects for faster access
-        self.cache_related_source_object()
-
-        super().save(*args, **kwargs)
-
-    def cache_related_source_object(self):
-        """
-        Cache the related source objects for faster access.
-        """
-        self._source_aggregate = self._source_ipaddress = self._source_iprange = self._source_prefix = None
-        if self.source_type:
-            source_type = self.source_type.model_class()
-            if source_type == apps.get_model("ipam", "aggregate"):
-                self._source_aggregate = self.source
-            elif source_type == apps.get_model("ipam", "ipaddress"):
-                self._source_ipaddress = self.source
-            elif source_type == apps.get_model("ipam", "iprange"):
-                self._source_iprange = self.source
-            elif source_type == apps.get_model("ipam", "prefix"):
-                self._source_prefix = self.source
-
-    cache_related_source_object.alters_data = True
 
     def get_absolute_url(self):
         """
@@ -211,10 +125,20 @@ class ACLRule(NetBoxModel):
     def get_action_color(self):
         return ACLRuleActionChoices.colors.get(self.action)
 
-    def to_objectchange(self, action):
-        objectchange = super().to_objectchange(action)
-        objectchange.related_object = self.access_list
-        return objectchange
+    def clean(self):
+        """
+        Validate common ACL Rule inputs for both standard and extended rules.
+        """
+        super().clean()
+        errors = {}
+
+        # Validate that both source_device and source_prefix are not set at the same time
+        if self.source_device and self.source_prefix:
+            errors["source_device"] = ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX
+            errors["source_prefix"] = ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX
+
+        if errors:
+            raise ValidationError(errors)
 
 
 class ACLStandardRule(ACLRule):
@@ -246,7 +170,7 @@ class ACLStandardRule(ACLRule):
         Validate the ACL Standard Rule inputs.
 
         If the action is 'remark', then the remark field must be provided (non-empty),
-        and the source field must be empty.
+        and the source_prefix field must be empty.
         Conversely, if the remark field is provided, the action must be set to 'remark'.
         """
 
@@ -257,8 +181,10 @@ class ACLStandardRule(ACLRule):
         if self.action == ACLRuleActionChoices.ACTION_REMARK:
             if not self.remark:
                 errors["remark"] = ERROR_MESSAGE_NO_REMARK
-            if self.source:
-                errors["source"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_SET
+            if self.source_prefix:
+                errors["source_prefix"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_PREFIX_SET
+            if self.source_device:
+                errors["source_device"] = _("When the action is 'remark', Source Device must not be set.")
         # Validate that the action is "remark", when the remark field is provided
         elif self.remark:
             errors["remark"] = ERROR_MESSAGE_REMARK_WITHOUT_ACTION_REMARK
@@ -270,8 +196,7 @@ class ACLStandardRule(ACLRule):
 class ACLExtendedRule(ACLRule):
     """
     Inherits ACLRule.
-
-    Add ACLExtendedRule specific fields: source_ports, destination, destination_ports, and protocol
+    Add ACLExtendedRule specific fields: source_ports, destination_prefix, destination_ports, and protocol
     """
 
     access_list = models.ForeignKey(
@@ -281,8 +206,37 @@ class ACLExtendedRule(ACLRule):
         limit_choices_to={"type": "extended"},
         verbose_name=_("Extended Access List"),
     )
-
-    # Protocol
+    # ИЗМЕНЕНО: CharField вместо ArrayField для поддержки диапазонов портов
+    source_ports = models.CharField(
+        verbose_name=_("Source Ports"),
+        max_length=100,
+        blank=True,
+        help_text=_("Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"),
+    )
+    destination_prefix = models.ForeignKey(
+        to="ipam.prefix",
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name=_("Destination Prefix"),
+        blank=True,
+        null=True,
+    )
+    # Добавлено: поле для устройства-назначения
+    destination_device = models.ForeignKey(
+        to="dcim.Device",
+        on_delete=models.PROTECT,
+        related_name="+",
+        verbose_name=_("Destination Device"),
+        blank=True,
+        null=True,
+    )
+    # ИЗМЕНЕНО: CharField вместо ArrayField для поддержки диапазонов портов
+    destination_ports = models.CharField(
+        verbose_name=_("Destination Ports"),
+        max_length=100,
+        blank=True,
+        help_text=_("Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"),
+    )
     protocol = models.CharField(
         verbose_name=_("Protocol"),
         max_length=30,
@@ -290,82 +244,14 @@ class ACLExtendedRule(ACLRule):
         blank=True,
     )
 
-    # Source
-    source_ports = ArrayField(
-        base_field=models.PositiveIntegerField(),
-        verbose_name=_("Source Ports"),
-        blank=True,
-        null=True,
-    )
-
-    # Destination
-    destination_type = models.ForeignKey(
-        to="contenttypes.ContentType",
-        on_delete=models.PROTECT,
-        related_name="+",
-        limit_choices_to=ACL_RULE_SOURCE_DESTINATION_MODELS,
-        verbose_name=_("Destination Type"),
-        blank=True,
-        null=True,
-    )
-    destination_id = models.PositiveBigIntegerField(
-        verbose_name=_("Destination ID"),
-        blank=True,
-        null=True,
-    )
-    destination = GenericForeignKey(
-        ct_field="destination_type",
-        fk_field="destination_id",
-    )
-    destination_ports = ArrayField(
-        base_field=models.PositiveIntegerField(),
-        verbose_name=_("Destination Ports"),
-        blank=True,
-        null=True,
-    )
-
-    # Cached related objects by association name for faster access
-    _destination_aggregate = models.ForeignKey(
-        to="ipam.aggregate",
-        on_delete=models.PROTECT,
-        related_name="_%(class)s_destinations",
-        verbose_name=_("Destination Aggregate"),
-        blank=True,
-        null=True,
-    )
-    _destination_ipaddress = models.ForeignKey(
-        to="ipam.ipaddress",
-        on_delete=models.PROTECT,
-        related_name="_%(class)s_destinations",
-        verbose_name=_("Destination IP-Address"),
-        blank=True,
-        null=True,
-    )
-    _destination_iprange = models.ForeignKey(
-        to="ipam.iprange",
-        on_delete=models.PROTECT,
-        related_name="_%(class)s_destinations",
-        verbose_name=_("Destination IP-Range"),
-        blank=True,
-        null=True,
-    )
-    _destination_prefix = models.ForeignKey(
-        to="ipam.prefix",
-        on_delete=models.PROTECT,
-        related_name="_%(class)s_destinations",
-        verbose_name=_("Destination Prefix"),
-        blank=True,
-        null=True,
-    )
-
     clone_fields = (
         "access_list",
         "action",
-        "source_id",
-        "source_type",
+        "source_prefix",
+        "source_device",
         "source_ports",
-        "destination_id",
-        "destination_type",
+        "destination_prefix",
+        "destination_device",
         "destination_ports",
         "protocol",
     )
@@ -380,7 +266,6 @@ class ACLExtendedRule(ACLRule):
 
         verbose_name = _("ACL Extended Rule")
         verbose_name_plural = _("ACL Extended Rules")
-        indexes = (models.Index(fields=("destination_type", "destination_id", "source_type", "source_id")),)
 
     def clean(self):
         """
@@ -388,39 +273,36 @@ class ACLExtendedRule(ACLRule):
 
         When the action is 'remark', the remark field must be provided (non-empty),
         and the following fields must be empty:
-          - source
+          - source_prefix
           - source_ports
-          - destination
+          - destination_prefix
           - destination_ports
           - protocol
 
         Conversely, if a remark is provided, the action must be set to 'remark'.
         """
-        # Validate destination assignment
-        if self.destination_type and not (self.destination or self.destination_id):
-            destination_type = self.destination_type.model_class()
-            raise ValidationError(
-                {
-                    "destination": _("Please select a destination {destination_type}.").format(
-                        destination_type=destination_type._meta.verbose_name,
-                    ),
-                },
-            )
-
         super().clean()
-
         errors = {}
+
+        # Validate that both destination_device and destination_prefix are not set at the same time
+        if self.destination_device and self.destination_prefix:
+            errors["destination_device"] = ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX
+            errors["destination_prefix"] = ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX
 
         # Validate that only the remark field is filled
         if self.action == ACLRuleActionChoices.ACTION_REMARK:
             if not self.remark:
                 errors["remark"] = ERROR_MESSAGE_NO_REMARK
-            if self.source:
-                errors["source"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_SET
+            if self.source_prefix:
+                errors["source_prefix"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_PREFIX_SET
+            if self.source_device:
+                errors["source_device"] = _("When the action is 'remark', Source Device must not be set.")
             if self.source_ports:
                 errors["source_ports"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_PORTS_SET
-            if self.destination:
-                errors["destination"] = ERROR_MESSAGE_ACTION_REMARK_DESTINATION_SET
+            if self.destination_prefix:
+                errors["destination_prefix"] = ERROR_MESSAGE_ACTION_REMARK_DESTINATION_PREFIX_SET
+            if self.destination_device:
+                errors["destination_device"] = _("When the action is 'remark', Destination Device must not be set.")
             if self.destination_ports:
                 errors["destination_ports"] = ERROR_MESSAGE_ACTION_REMARK_DESTINATION_PORTS_SET
             if self.protocol:
@@ -432,140 +314,5 @@ class ACLExtendedRule(ACLRule):
         if errors:
             raise ValidationError(errors)
 
-    def save(self, *args, **kwargs):
-        """
-        Saves the current instance to the database.
-        """
-        # Cache the related destination objects for faster access
-        self.cache_related_destination_objects()
-
-        super().save(*args, **kwargs)
-
-    def cache_related_destination_objects(self):
-        """
-        Cache the related destination objects for faster access.
-        """
-        self._destination_aggregate = self._destination_ipaddress = self._destination_iprange = (
-            self._destination_prefix
-        ) = None
-        if self.destination_type:
-            destination_type = self.destination_type.model_class()
-            if destination_type == apps.get_model("ipam", "aggregate"):
-                self._destination_aggregate = self.destination
-            elif destination_type == apps.get_model("ipam", "ipaddress"):
-                self._destination_ipaddress = self.destination
-            elif destination_type == apps.get_model("ipam", "iprange"):
-                self._destination_iprange = self.destination
-            elif destination_type == apps.get_model("ipam", "prefix"):
-                self._destination_prefix = self.destination
-
-    cache_related_destination_objects.alters_data = True
-
     def get_protocol_color(self):
         return ACLProtocolChoices.colors.get(self.protocol)
-
-
-#
-# Generic Relations: ACLStandardRule
-#
-
-# Source Aggregate
-GenericRelation(
-    to=ACLStandardRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_aggregate",
-).contribute_to_class(Aggregate, "accesslist_standard_rule_sources")
-
-# Source IPAddress
-GenericRelation(
-    to=ACLStandardRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_ip_address",
-).contribute_to_class(IPAddress, "accesslist_standard_rule_sources")
-
-# Source IPRange
-GenericRelation(
-    to=ACLStandardRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_ip_range",
-).contribute_to_class(IPRange, "accesslist_standard_rule_sources")
-
-# Source Prefix
-GenericRelation(
-    to=ACLStandardRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_prefix",
-).contribute_to_class(Prefix, "accesslist_standard_rule_sources")
-
-
-#
-# Generic Relations: ACLExtendedRule
-#
-
-# Source Aggregate
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_aggregate",
-).contribute_to_class(Aggregate, "accesslist_extended_rule_sources")
-
-# Source IPAddress
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_ip_address",
-).contribute_to_class(IPAddress, "accesslist_extended_rule_sources")
-
-# Source IPRange
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_ip_range",
-).contribute_to_class(IPRange, "accesslist_extended_rule_sources")
-
-# Source Prefix
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="source_type",
-    object_id_field="source_id",
-    related_query_name="source_prefix",
-).contribute_to_class(Prefix, "accesslist_extended_rule_sources")
-
-# Destination Aggregate
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="destination_type",
-    object_id_field="destination_id",
-    related_query_name="destination_aggregate",
-).contribute_to_class(Aggregate, "accesslist_extended_rule_destinations")
-
-# Destination IPAddress
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="destination_type",
-    object_id_field="destination_id",
-    related_query_name="destination_ip_address",
-).contribute_to_class(IPAddress, "accesslist_extended_rule_destinations")
-
-# Destination IPRange
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="destination_type",
-    object_id_field="destination_id",
-    related_query_name="destination_ip_range",
-).contribute_to_class(IPRange, "accesslist_extended_rule_destinations")
-
-# Destination Prefix
-GenericRelation(
-    to=ACLExtendedRule,
-    content_type_field="destination_type",
-    object_id_field="destination_id",
-    related_query_name="destination_prefix",
-).contribute_to_class(Prefix, "accesslist_extended_rule_destinations")
