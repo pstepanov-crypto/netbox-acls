@@ -81,7 +81,8 @@ class AccessListSerializer(NetBoxModelSerializer):
             "last_updated",
             "rule_count",
         )
-        brief_fields = ("id", "url", "display", "name")
+        # ОБНОВЛЕНО: добавим host_ip в brief_fields
+        brief_fields = ("id", "url", "display", "name", "host_ip")
 
     @extend_schema_field(serializers.JSONField(allow_null=True))
     def get_assigned_object(self, obj):
