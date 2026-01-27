@@ -1,351 +1,219 @@
 """
-Filters enable users to request only a specific subset of objects matching a query;
-when filtering the site list by status or region, for instance.
+Defines each django model's GUI filter/search options.
 """
 
-import django_filters
-from dcim.models import Device, Interface, Region, Site, SiteGroup, VirtualChassis
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
-from ipam.models import Prefix
 from netbox.filtersets import NetBoxModelFilterSet
-from virtualization.models import VirtualMachine, VMInterface
+from tenancy.filtersets import TenancyFilterSet
+from utilities.filters import MultiValueCharFilter, MultiValueNumberFilter
 
-from .choices import ACLTypeChoices
-from .models import AccessList, ACLExtendedRule, ACLInterfaceAssignment, ACLStandardRule
-
-__all__ = (
-    "AccessListFilterSet",
-    "ACLStandardRuleFilterSet",
-    "ACLInterfaceAssignmentFilterSet",
-    "ACLExtendedRuleFilterSet",
+from .choices import ACLActionChoices, ACLDirectionChoices, ACLTypeChoices
+from .models import (
+    AccessList,
+    ACLExtendedRule,
+    ACLInterfaceAssignment,
+    ACLStandardRule,
 )
 
 
-class AccessListFilterSet(NetBoxModelFilterSet):
-    """
-    Define the filter set for the django model AccessList.
-    """
+class AccessListFilterSet(NetBoxModelFilterSet, TenancyFilterSet):
+    """FilterSet for AccessList model."""
 
-    region = django_filters.ModelMultipleChoiceFilter(
-        field_name="device__site__region",
-        queryset=Region.objects.all(),
-        to_field_name="id",
-        label="Region",
+    type = MultiValueCharFilter(
+        field_name="type",
     )
-    site_group = django_filters.ModelMultipleChoiceFilter(
-        field_name="device__site__group",
-        queryset=SiteGroup.objects.all(),
-        to_field_name="id",
-        label="Site Group",
+    default_action = MultiValueCharFilter(
+        field_name="default_action",
     )
-    site = django_filters.ModelMultipleChoiceFilter(
-        field_name="device__site",
-        queryset=Site.objects.all(),
-        to_field_name="id",
-        label="Site",
+    device_id = MultiValueNumberFilter(
+        field_name="device__id",
     )
-    device = django_filters.ModelMultipleChoiceFilter(
+    device = MultiValueCharFilter(
         field_name="device__name",
-        queryset=Device.objects.all(),
-        to_field_name="name",
         label="Device (name)",
     )
-    device_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="device",
-        queryset=Device.objects.all(),
-        label="Device (ID)",
+    virtual_machine_id = MultiValueNumberFilter(
+        field_name="virtual_machine__id",
     )
-    virtual_chassis = django_filters.ModelMultipleChoiceFilter(
-        field_name="virtual_chassis__name",
-        queryset=VirtualChassis.objects.all(),
-        to_field_name="name",
-        label="Virtual Chassis (name)",
-    )
-    virtual_chassis_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="virtual_chassis",
-        queryset=VirtualChassis.objects.all(),
-        label="Virtual Chassis (ID)",
-    )
-    virtual_machine = django_filters.ModelMultipleChoiceFilter(
+    virtual_machine = MultiValueCharFilter(
         field_name="virtual_machine__name",
-        queryset=VirtualMachine.objects.all(),
-        to_field_name="name",
         label="Virtual Machine (name)",
     )
-    virtual_machine_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="virtual_machine",
-        queryset=VirtualMachine.objects.all(),
-        label="Virtual machine (ID)",
+    virtual_chassis_id = MultiValueNumberFilter(
+        field_name="virtual_chassis__id",
     )
 
     class Meta:
-        """
-        Associates the django model AccessList & fields to the filter set.
-        """
-
         model = AccessList
-        fields = (
-            "id",
-            "name",
-            "device",
-            "device_id",
-            "virtual_chassis",
-            "virtual_chassis_id",
-            "virtual_machine",
-            "virtual_machine_id",
-            "type",
-            "default_action",
-            "comments",
-            "site",
-            "site_group",
-            "region",
-        )
+        fields = ("id", "name", "type", "default_action")
 
     def search(self, queryset, name, value):
-        """
-        Override the default search behavior for the django model.
-        """
-        query = (
-            Q(name__icontains=value)
-            | Q(device__name__icontains=value)
-            | Q(virtual_chassis__name__icontains=value)
-            | Q(virtual_machine__name__icontains=value)
-            | Q(type__icontains=value)
-            | Q(default_action__icontains=value)
-            | Q(comments__icontains=value)
-        )
-        return queryset.filter(query)
+        """Search across AccessList fields."""
+        if not value.strip():
+            return queryset
+        qs_filter = Q(name__icontains=value) | Q(comments__icontains=value)
+        return queryset.filter(qs_filter).distinct()
 
 
 class ACLInterfaceAssignmentFilterSet(NetBoxModelFilterSet):
-    """
-    Define the filter set for the django model ACLInterfaceAssignment.
-    """
+    """FilterSet for ACLInterfaceAssignment model."""
 
-    access_list = django_filters.ModelMultipleChoiceFilter(
-        queryset=AccessList.objects.all(),
-        to_field_name="name",
-        label=_("Access List (name)"),
+    access_list_id = MultiValueNumberFilter(
+        field_name="access_list__id",
     )
-    access_list_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=AccessList.objects.all(),
-        to_field_name="id",
-        label=_("Access List (ID)"),
+    access_list = MultiValueCharFilter(
+        field_name="access_list__name",
+        label="Access List (name)",
     )
-    interface = django_filters.ModelMultipleChoiceFilter(
-        field_name="interface__name",
-        queryset=Interface.objects.all(),
-        to_field_name="name",
+    direction = MultiValueCharFilter(
+        field_name="direction",
+    )
+    device_id = MultiValueNumberFilter(
+        field_name="assigned_object__device__id",
+    )
+    device = MultiValueCharFilter(
+        field_name="assigned_object__device__name",
+        label="Device (name)",
+    )
+    interface_id = MultiValueNumberFilter(
+        field_name="assigned_object__id",
+    )
+    interface = MultiValueCharFilter(
+        field_name="assigned_object__name",
         label="Interface (name)",
     )
-    interface_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="interface",
-        queryset=Interface.objects.all(),
-        label="Interface (ID)",
+    virtual_machine_id = MultiValueNumberFilter(
+        field_name="assigned_object__virtual_machine__id",
     )
-    vminterface = django_filters.ModelMultipleChoiceFilter(
-        field_name="vminterface__name",
-        queryset=VMInterface.objects.all(),
-        to_field_name="name",
+    virtual_machine = MultiValueCharFilter(
+        field_name="assigned_object__virtual_machine__name",
+        label="Virtual Machine (name)",
+    )
+    vminterface_id = MultiValueNumberFilter(
+        field_name="assigned_object__id",
+    )
+    vminterface = MultiValueCharFilter(
+        field_name="assigned_object__name",
         label="VM Interface (name)",
-    )
-    vminterface_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="vminterface",
-        queryset=VMInterface.objects.all(),
-        label="VM Interface (ID)",
     )
 
     class Meta:
-        """
-        Associates the django model ACLInterfaceAssignment & fields to the filter set.
-        """
-
         model = ACLInterfaceAssignment
-        fields = (
-            "id",
-            "access_list",
-            "direction",
-            "interface",
-            "interface_id",
-            "vminterface",
-            "vminterface_id",
-        )
+        fields = ("id", "access_list", "direction")
 
     def search(self, queryset, name, value):
-        """
-        Override the default search behavior for the django model.
-        """
-        query = (
-            Q(access_list__name__icontains=value)
-            | Q(direction__icontains=value)
-            | Q(interface__name__icontains=value)
-            | Q(vminterface__name__icontains=value)
+        """Search across ACLInterfaceAssignment fields."""
+        if not value.strip():
+            return queryset
+        qs_filter = Q(access_list__name__icontains=value) | Q(
+            assigned_object__name__icontains=value
         )
-        return queryset.filter(query)
+        return queryset.filter(qs_filter).distinct()
 
 
 class ACLStandardRuleFilterSet(NetBoxModelFilterSet):
-    """
-    Define the filter set for the django model ACLStandardRule.
-    """
+    """FilterSet for ACLStandardRule model."""
 
-    # Access List
-    access_list = django_filters.ModelMultipleChoiceFilter(
-        queryset=AccessList.objects.all(),
-        to_field_name="name",
-        label=_("Access List (name)"),
+    access_list_id = MultiValueNumberFilter(
+        field_name="access_list__id",
     )
-    access_list_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=AccessList.objects.all(),
-        to_field_name="id",
-        label=_("Access List (ID)"),
+    access_list = MultiValueCharFilter(
+        field_name="access_list__name",
+        label="Access List (name)",
     )
-
-    # Source
-    source_prefix = django_filters.ModelMultipleChoiceFilter(
+    action = MultiValueCharFilter(
+        field_name="action",
+    )
+    index = MultiValueNumberFilter(
+        field_name="index",
+    )
+    # ТОЛЬКО source_prefix - без source_device
+    source_prefix = MultiValueCharFilter(
         field_name="source_prefix",
-        queryset=Prefix.objects.all(),
-        to_field_name="name",
-        label=_("Source Prefix (name)"),
-    )
-    source_prefix_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="source_prefix",
-        queryset=Prefix.objects.all(),
-        to_field_name="id",
-        label=_("Source Prefix (ID)"),
-    )
-    # Добавлено: фильтры для устройства-источника
-    source_device = django_filters.ModelMultipleChoiceFilter(
-        field_name="source_device__name",
-        queryset=Device.objects.all(),
-        to_field_name="name",
-        label=_("Source Device (name)"),
-    )
-    source_device_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="source_device",
-        queryset=Device.objects.all(),
-        label=_("Source Device (ID)"),
+        label="Source Prefix",
     )
 
     class Meta:
-        """
-        Associates the django model ACLStandardRule & fields to the filter set.
-        """
-
         model = ACLStandardRule
-        fields = ("id", "access_list", "index", "action", "source_device", "source_device_id")
+        fields = ("id", "access_list", "action", "index", "remark", "source_prefix")
 
     def search(self, queryset, name, value):
-        """
-        Override the default search behavior for the django model.
-        """
-        query = (
+        """Search across ACLStandardRule fields."""
+        if not value.strip():
+            return queryset
+        qs_filter = (
             Q(access_list__name__icontains=value)
-            | Q(index__icontains=value)
-            | Q(action__icontains=value)
-            | Q(source_device__name__icontains=value)  # Добавлено
+            | Q(remark__icontains=value)
+            | Q(source_prefix__icontains=value)
+            | Q(description__icontains=value)
         )
-        return queryset.filter(query)
+        return queryset.filter(qs_filter).distinct()
 
 
 class ACLExtendedRuleFilterSet(NetBoxModelFilterSet):
-    """
-    Define the filter set for the django model ACLExtendedRule.
-    """
+    """FilterSet for ACLExtendedRule model."""
 
-    # Access List
-    access_list = django_filters.ModelMultipleChoiceFilter(
-        queryset=AccessList.objects.filter(type=ACLTypeChoices.TYPE_EXTENDED),
-        to_field_name="name",
-        label=_("Access List (name)"),
+    access_list_id = MultiValueNumberFilter(
+        field_name="access_list__id",
     )
-    access_list_id = django_filters.ModelMultipleChoiceFilter(
-        queryset=AccessList.objects.filter(type=ACLTypeChoices.TYPE_EXTENDED),
-        to_field_name="id",
-        label=_("Access List (ID)"),
+    access_list = MultiValueCharFilter(
+        field_name="access_list__name",
+        label="Access List (name)",
     )
-
-    # Source
-    source_prefix = django_filters.ModelMultipleChoiceFilter(
+    action = MultiValueCharFilter(
+        field_name="action",
+    )
+    index = MultiValueNumberFilter(
+        field_name="index",
+    )
+    protocol = MultiValueCharFilter(
+        field_name="protocol",
+    )
+    # ТОЛЬКО новые поля - без source_device и destination_device
+    source_prefix = MultiValueCharFilter(
         field_name="source_prefix",
-        queryset=Prefix.objects.all(),
-        to_field_name="name",
-        label=_("Source Prefix (name)"),
+        label="Source Prefix",
     )
-    source_prefix_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="source_prefix",
-        queryset=Prefix.objects.all(),
-        to_field_name="id",
-        label=_("Source Prefix (ID)"),
-    )
-    # Добавлено: фильтры для устройства-источника
-    source_device = django_filters.ModelMultipleChoiceFilter(
-        field_name="source_device__name",
-        queryset=Device.objects.all(),
-        to_field_name="name",
-        label=_("Source Device (name)"),
-    )
-    source_device_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="source_device",
-        queryset=Device.objects.all(),
-        label=_("Source Device (ID)"),
-    )
-
-    # Destination
-    destination_prefix = django_filters.ModelMultipleChoiceFilter(
+    destination_prefix = MultiValueCharFilter(
         field_name="destination_prefix",
-        queryset=Prefix.objects.all(),
-        to_field_name="name",
-        label=_("Destination Prefix (name)"),
+        label="Destination Prefix",
     )
-    destination_prefix_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="destination_prefix",
-        queryset=Prefix.objects.all(),
-        to_field_name="id",
-        label=_("Destination Prefix (ID)"),
+    source_ports = MultiValueCharFilter(
+        field_name="source_ports",
+        label="Source Ports",
     )
-    # Добавлено: фильтры для устройства-назначения
-    destination_device = django_filters.ModelMultipleChoiceFilter(
-        field_name="destination_device__name",
-        queryset=Device.objects.all(),
-        to_field_name="name",
-        label=_("Destination Device (name)"),
-    )
-    destination_device_id = django_filters.ModelMultipleChoiceFilter(
-        field_name="destination_device",
-        queryset=Device.objects.all(),
-        label=_("Destination Device (ID)"),
+    destination_ports = MultiValueCharFilter(
+        field_name="destination_ports",
+        label="Destination Ports",
     )
 
     class Meta:
-        """
-        Associates the django model ACLExtendedRule & fields to the filter set.
-        """
-
         model = ACLExtendedRule
         fields = (
-            "id", 
-            "access_list", 
-            "index", 
-            "action", 
+            "id",
+            "access_list",
+            "action",
+            "index",
+            "remark",
             "protocol",
-            "source_device", 
-            "source_device_id",
-            "destination_device", 
-            "destination_device_id"
+            "source_prefix",
+            "destination_prefix",
+            "source_ports",
+            "destination_ports",
         )
 
     def search(self, queryset, name, value):
-        """
-        Override the default search behavior for the django model.
-        """
-        query = (
+        """Search across ACLExtendedRule fields."""
+        if not value.strip():
+            return queryset
+        qs_filter = (
             Q(access_list__name__icontains=value)
-            | Q(index__icontains=value)
-            | Q(action__icontains=value)
-            | Q(protocol__icontains=value)
-            | Q(source_device__name__icontains=value)      # Добавлено
-            | Q(destination_device__name__icontains=value) # Добавлено
+            | Q(remark__icontains=value)
+            | Q(source_prefix__icontains=value)
+            | Q(destination_prefix__icontains=value)
+            | Q(source_ports__icontains=value)
+            | Q(destination_ports__icontains=value)
+            | Q(description__icontains=value)
         )
-        return queryset.filter(query)
+        return queryset.filter(qs_filter).distinct()
