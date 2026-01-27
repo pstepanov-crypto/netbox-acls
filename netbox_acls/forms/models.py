@@ -2,6 +2,7 @@
 Defines each django model's GUI form to add or edit objects for each django model.
 """
 
+import re
 from dcim.models import Device, Interface, Region, Site, SiteGroup, VirtualChassis
 from django import forms
 from django.contrib.contenttypes.models import ContentType
@@ -364,10 +365,10 @@ class ACLInterfaceAssignmentForm(NetBoxModelForm):
         if instance:
             if type(instance.assigned_object) is Interface:
                 initial["interface"] = instance.assigned_object
-                initial["device"] = "device"
+                initial["device"] = instance.assigned_object.device
             elif type(instance.assigned_object) is VMInterface:
                 initial["vminterface"] = instance.assigned_object
-                initial["virtual_machine"] = "virtual_machine"
+                initial["virtual_machine"] = instance.assigned_object.virtual_machine
         kwargs["initial"] = initial
 
         super().__init__(*args, **kwargs)
@@ -551,9 +552,74 @@ class ACLStandardRuleForm(NetBoxModelForm):
 
     def clean(self):
         """
-        Validate that both source_device and source_prefix are not set at the same time.
+        Validate that:
+        - Either remark OR (action and source_prefix) are set, but not both
+        - If action is remark, source_prefix must be empty
+        - Index must be unique within the access list
         """
         super().clean()
+        
+        cleaned_data = self.cleaned_data
+        remark = cleaned_data.get("remark")
+        action = cleaned_data.get("action")
+        source_prefix = cleaned_data.get("source_prefix")
+        access_list = cleaned_data.get("access_list")
+        index = cleaned_data.get("index")
+        
+        errors = {}
+        
+        # Rule 1: If remark is set, action must be 'remark'
+        if remark and action and action != "remark":
+            errors["action"] = "Action must be 'remark' when remark field is used"
+        
+        # Rule 2: If action is 'remark', source_prefix must be empty
+        if action == "remark" and source_prefix:
+            errors["source_prefix"] = "Cannot set source prefix when action is 'remark'"
+        
+        # Rule 3: If not remark, then action and source_prefix are required
+        if not remark:
+            if not action:
+                errors["action"] = "Action is required"
+            if not source_prefix:
+                errors["source_prefix"] = "Source prefix is required when not using remark"
+        
+        # Rule 4: Validate source prefix format (basic validation)
+        if source_prefix:
+            if not self.validate_prefix_format(source_prefix):
+                errors["source_prefix"] = "Invalid prefix format. Use CIDR notation (e.g., 192.168.1.0/24) or 'host 1.1.1.1'"
+        
+        # Rule 5: Check if index is unique within the access list
+        if access_list and index:
+            existing_rule = ACLStandardRule.objects.filter(
+                access_list=access_list,
+                index=index
+            ).exclude(pk=self.instance.pk if self.instance else None)
+            
+            if existing_rule.exists():
+                errors["index"] = f"Rule with index {index} already exists in this Access List"
+        
+        if errors:
+            raise ValidationError(errors)
+    
+    def validate_prefix_format(self, prefix_string):
+        """Validate prefix string format"""
+        # Simple validation - expand as needed
+        import ipaddress
+        
+        try:
+            # Try to parse as CIDR
+            ipaddress.ip_network(prefix_string, strict=False)
+            return True
+        except ValueError:
+            # Check for "host x.x.x.x" format
+            if prefix_string.lower().startswith("host "):
+                host_ip = prefix_string[5:].strip()
+                try:
+                    ipaddress.ip_address(host_ip)
+                    return True
+                except ValueError:
+                    return False
+            return False
 
 
 class ACLExtendedRuleForm(NetBoxModelForm):
@@ -654,21 +720,103 @@ class ACLExtendedRuleForm(NetBoxModelForm):
 
     def clean(self):
         """
-        Validate that both source_device/source_prefix
-        are not set at the same time.
+        Validate extended ACL rule fields:
+        - If action is 'remark', validate remark logic
+        - Validate port formats
+        - Validate prefix formats
+        - Check index uniqueness
         """
         super().clean()
         
-        source_prefix = self.cleaned_data.get("source_prefix")
-        destination_prefix = self.cleaned_data.get("destination_prefix")
+        cleaned_data = self.cleaned_data
+        remark = cleaned_data.get("remark")
+        action = cleaned_data.get("action")
+        source_prefix = cleaned_data.get("source_prefix")
+        destination_prefix = cleaned_data.get("destination_prefix")
+        source_ports = cleaned_data.get("source_ports")
+        destination_ports = cleaned_data.get("destination_ports")
+        protocol = cleaned_data.get("protocol")
+        access_list = cleaned_data.get("access_list")
+        index = cleaned_data.get("index")
         
         errors = {}
         
-        if source_device and source_prefix:
-            errors["source_prefix"] = "Cannot set both Source Device and Source Prefix."
+        # Rule 1: If remark is set, action must be 'remark'
+        if remark and action and action != "remark":
+            errors["action"] = "Action must be 'remark' when remark field is used"
+        
+        # Rule 2: If action is 'remark', other fields should be empty
+        if action == "remark":
+            fields_to_check = ["source_prefix", "source_ports", 
+                             "destination_prefix", "destination_ports", "protocol"]
+            for field in fields_to_check:
+                if cleaned_data.get(field):
+                    errors[field] = f"Cannot set {field} when action is 'remark'"
+        else:
+            # Rule 3: For non-remark rules, require action
+            if not action:
+                errors["action"] = "Action is required"
             
-        if destination_device and destination_prefix:
-            errors["destination_prefix"] = "Cannot set both Destination Device and Destination Prefix."
+            # Rule 4: Require at least source or destination prefix for non-remark rules
+            if not source_prefix and not destination_prefix:
+                errors["source_prefix"] = "At least one of Source or Destination prefix is required"
+                errors["destination_prefix"] = "At least one of Source or Destination prefix is required"
+        
+        # Rule 5: Validate source prefix format
+        if source_prefix:
+            if not self.validate_prefix_format(source_prefix):
+                errors["source_prefix"] = "Invalid source prefix format. Use CIDR notation (e.g., 192.168.1.0/24) or 'host 1.1.1.1'"
+        
+        # Rule 6: Validate destination prefix format
+        if destination_prefix:
+            if not self.validate_prefix_format(destination_prefix):
+                errors["destination_prefix"] = "Invalid destination prefix format. Use CIDR notation (e.g., 192.168.1.0/24) or 'host 1.1.1.1'"
+        
+        # Rule 7: Validate source ports format
+        if source_ports:
+            if not self.validate_port_format(source_ports):
+                errors["source_ports"] = "Invalid source port format. Use single port, range (e.g., 80-100), or comma-separated list"
+        
+        # Rule 8: Validate destination ports format
+        if destination_ports:
+            if not self.validate_port_format(destination_ports):
+                errors["destination_ports"] = "Invalid destination port format. Use single port, range (e.g., 80-100), or comma-separated list"
+        
+        # Rule 9: Check if index is unique within the access list
+        if access_list and index:
+            existing_rule = ACLExtendedRule.objects.filter(
+                access_list=access_list,
+                index=index
+            ).exclude(pk=self.instance.pk if self.instance else None)
             
+            if existing_rule.exists():
+                errors["index"] = f"Rule with index {index} already exists in this Access List"
+        
         if errors:
             raise ValidationError(errors)
+    
+    def validate_prefix_format(self, prefix_string):
+        """Validate prefix string format"""
+        # Simple validation - expand as needed
+        import ipaddress
+        
+        try:
+            # Try to parse as CIDR
+            ipaddress.ip_network(prefix_string, strict=False)
+            return True
+        except ValueError:
+            # Check for "host x.x.x.x" format
+            if prefix_string.lower().startswith("host "):
+                host_ip = prefix_string[5:].strip()
+                try:
+                    ipaddress.ip_address(host_ip)
+                    return True
+                except ValueError:
+                    return False
+            return False
+    
+    def validate_port_format(self, port_string):
+        """Validate port string format"""
+        # Allow: single port (80), range (80-100), eq www, range 445 1050
+        pattern = r'^(\d+(-\d+)?)(,\s*\d+(-\d+)?)*$|^(eq|range)\s+\w+(\s+\w+)?$'
+        return bool(re.match(pattern, str(port_string)))
