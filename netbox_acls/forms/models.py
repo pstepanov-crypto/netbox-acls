@@ -10,13 +10,12 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from netbox.models import NetBoxModel, PrimaryModel
 from utilities.querysets import RestrictedQuerySet
-
-from .choices import (
-    ACLActionChoices,
-    ACLAssignmentDirectionChoices,
-    ACLProtocolChoices,
-    ACLRuleActionChoices,
-    ACLTypeChoices,
+from ..choices import ACLTypeChoices
+from ..models import (
+    AccessList,
+    ACLExtendedRule,
+    ACLInterfaceAssignment,
+    ACLStandardRule,
 )
 
 
