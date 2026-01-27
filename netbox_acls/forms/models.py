@@ -1,15 +1,25 @@
 """
-Defines each django model for the plugin.
+Defines each django model's GUI form to add or edit objects for each django model.
 """
 
-from django.contrib.contenttypes.fields import GenericForeignKey
+from dcim.models import Device, Interface, Region, Site, SiteGroup, VirtualChassis
+from django import forms
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import models
-from django.urls import reverse
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from netbox.models import NetBoxModel, PrimaryModel
-from utilities.querysets import RestrictedQuerySet
+from ipam.models import Prefix
+from netbox.forms import NetBoxModelForm
+from utilities.forms.fields import CommentField, DynamicModelChoiceField
+from utilities.forms.rendering import FieldSet, TabbedGroups
+from virtualization.models import (
+    Cluster,
+    ClusterGroup,
+    ClusterType,
+    VirtualMachine,
+    VMInterface,
+)
+
 from ..choices import ACLTypeChoices
 from ..models import (
     AccessList,
@@ -18,343 +28,324 @@ from ..models import (
     ACLStandardRule,
 )
 
+__all__ = (
+    "AccessListForm",
+    "ACLInterfaceAssignmentForm",
+    "ACLStandardRuleForm",
+    "ACLExtendedRuleForm",
+)
 
-class AccessList(NetBoxModel):
-    """
-    Defines an ACL bound to a Device, Virtual Chassis or Virtual Machine.
-    """
+help_text_acl_rule_logic = mark_safe(
+    "<b>*Note:</b> CANNOT be set if action is set to remark.",
+)
+help_text_acl_action = "Action the rule will take (remark, deny, or allow)."
+help_text_acl_rule_index = "Determines the order of the rule in the ACL processing. AKA Sequence Number."
+help_text_acl_ports = "Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"
+help_text_acl_prefix = "IP prefix, network or host (e.g., 192.168.1.0/24, host 10.1.1.1)"
 
-    assigned_object_type = models.ForeignKey(
-        to=ContentType,
-        on_delete=models.PROTECT,
-        related_name="+",
-        blank=True,
-        null=True,
-    )
-    assigned_object_id = models.PositiveIntegerField(
-        blank=True,
-        null=True,
-    )
-    assigned_object = GenericForeignKey(
-        ct_field="assigned_object_type",
-        fk_field="assigned_object_id",
-    )
 
-    name = models.CharField(
-        max_length=255,
-        verbose_name=_("Name"),
-        help_text=_("The name uniqueness per device is case insensitive."),
+class AccessListForm(NetBoxModelForm):
+
+    region = DynamicModelChoiceField(
+        queryset=Region.objects.all(),
+        required=False,
+        initial_params={"sites": "$site"},
     )
-    type = models.CharField(
-        max_length=30,
-        choices=ACLTypeChoices,
-        default=ACLTypeChoices.TYPE_STANDARD,
-        verbose_name=_("Type"),
-        help_text=_("Standard or extended ACL."),
+    site_group = DynamicModelChoiceField(
+        queryset=SiteGroup.objects.all(),
+        required=False,
+        label="Site Group",
+        initial_params={"sites": "$site"},
     )
-    default_action = models.CharField(
-        max_length=30,
-        choices=ACLActionChoices,
-        default=ACLActionChoices.ACTION_DENY,
-        verbose_name=_("Default Action"),
-        help_text=_("The default behavior of the ACL."),
+    site = DynamicModelChoiceField(
+        queryset=Site.objects.all(),
+        required=False,
+        query_params={"region_id": "$region", "group_id": "$site_group"},
+    )
+    device = DynamicModelChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
+        query_params={
+            "region_id": "$region",
+            "group_id": "$site_group",
+            "site_id": "$site",
+        },
     )
 
-    objects = RestrictedQuerySet.as_manager()
+    virtual_chassis = DynamicModelChoiceField(
+        queryset=VirtualChassis.objects.all(),
+        required=False,
+        label="Virtual Chassis",
+    )
+
+    cluster_type = DynamicModelChoiceField(
+        queryset=ClusterType.objects.all(),
+        required=False,
+    )
+    cluster_group = DynamicModelChoiceField(
+        queryset=ClusterGroup.objects.all(),
+        required=False,
+        query_params={"type_id": "$cluster_type"},
+    )
+    cluster = DynamicModelChoiceField(
+        queryset=Cluster.objects.all(),
+        required=False,
+        query_params={"type_id": "$cluster_type", "group_id": "$cluster_group"},
+    )
+
+    virtual_machine = DynamicModelChoiceField(
+        queryset=VirtualMachine.objects.all(),
+        required=False,
+        query_params={
+            "cluster_id": "$cluster",
+            "cluster_type_id": "$cluster_type",
+            "cluster_group_id": "$cluster_group",
+        },
+    )
+
+    comments = CommentField()
+
+    fieldsets = (
+        FieldSet(
+            "name",
+            "type",
+            "default_action",
+            "tags",
+            name=_("Access List Details"),
+        ),
+        FieldSet(
+            TabbedGroups(
+                FieldSet("region", "site_group", "site", "device", name=_("Device")),
+                FieldSet("virtual_chassis", name=_("Virtual Chassis")),
+                FieldSet(
+                    "cluster_type",
+                    "cluster_group",
+                    "cluster",
+                    "virtual_machine",
+                    name=_("Virtual Machine"),
+                ),
+            ),
+            name=_("Host Assignment"),
+        ),
+    )
 
     class Meta:
-        ordering = ("name", "assigned_object_type", "assigned_object_id")
-        unique_together = (
-            ("assigned_object_type", "assigned_object_id", "name"),
+        model = AccessList
+        fields = (
+            "region",
+            "site_group",
+            "site",
+            "device",
+            "virtual_machine",
+            "virtual_chassis",
+            "name",
+            "type",
+            "default_action",
+            "comments",
+            "tags",
         )
-        verbose_name = _("Access List")
-        verbose_name_plural = _("Access Lists")
 
-    def __str__(self):
-        return self.name
-
-    def get_absolute_url(self):
-        return reverse("plugins:netbox_acls:accesslist", args=[self.pk])
-
-    def get_type_color(self):
-        return ACLTypeChoices.colors.get(self.type)
-
-    @property
-    def device(self):
-        from dcim.models import Device
-
-        if isinstance(self.assigned_object, Device):
-            return self.assigned_object
-        return None
-
-    @property
-    def virtual_machine(self):
-        from virtualization.models import VirtualMachine
-
-        if isinstance(self.assigned_object, VirtualMachine):
-            return self.assigned_object
-        return None
-
-    @property
-    def virtual_chassis(self):
-        from dcim.models import VirtualChassis
-
-        if isinstance(self.assigned_object, VirtualChassis):
-            return self.assigned_object
-        return None
-
-    @property
-    def rule_count(self):
-        if self.type == ACLTypeChoices.TYPE_STANDARD:
-            return self.aclstandardrules.count()
-        else:
-            return self.aclextendedrules.count()
-
-
-class ACLStandardRule(NetBoxModel):
-    """
-    Defines a Standard ACL rule.
-    """
-
-    access_list = models.ForeignKey(
-        to=AccessList,
-        on_delete=models.CASCADE,
-        related_name="aclstandardrules",
-        limit_choices_to={"type": ACLTypeChoices.TYPE_STANDARD},
-    )
-    index = models.PositiveIntegerField(
-        verbose_name=_("Index"),
-        help_text=_("Determines the order of the rule in the ACL processing. AKA Sequence Number."),
-    )
-    action = models.CharField(
-        max_length=30,
-        choices=ACLRuleActionChoices,
-        verbose_name=_("Action"),
-        help_text=_("Action the rule will take (remark, deny, or allow)."),
-    )
-    remark = models.CharField(
-        max_length=500,
-        blank=True,
-        verbose_name=_("Remark"),
-    )
-    
-    # ИЗМЕНЕНО: ForeignKey заменен на CharField
-    source_prefix = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name=_("Source Prefix/Host"),
-        help_text=_("IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)"),
-    )
-    
-    description = models.CharField(
-        max_length=200,
-        blank=True,
-        verbose_name=_("Description"),
-    )
-
-    objects = RestrictedQuerySet.as_manager()
-
-    class Meta:
-        ordering = ("access_list", "index")
-        unique_together = (
-            ("access_list", "index"),
-        )
-        verbose_name = _("ACL Standard Rule")
-        verbose_name_plural = _("ACL Standard Rules")
-
-    def __str__(self):
-        return f"{self.access_list.name} - {self.index}: {self.action}"
-
-    def get_absolute_url(self):
-        return reverse("plugins:netbox_acls:aclstandardrule", args=[self.pk])
+        help_texts = {
+            "default_action": "The default behavior of the ACL.",
+            "name": "The name uniqueness per device is case insensitive.",
+            "type": mark_safe(
+                "<b>*Note:</b> CANNOT be changed if ACL Rules are associated to this Access List.",
+            ),
+        }
 
     def clean(self):
         super().clean()
 
-        if self.action == ACLRuleActionChoices.ACTION_REMARK and self.source_prefix:
+        device = self.cleaned_data.get("device")
+        virtual_chassis = self.cleaned_data.get("virtual_chassis")
+        virtual_machine = self.cleaned_data.get("virtual_machine")
+
+        if sum(bool(x) for x in (device, virtual_chassis, virtual_machine)) != 1:
             raise ValidationError(
-                {"source_prefix": _("Source prefix must be empty when action is remark.")}
+                "__all__",
+                "Access Lists must be assigned to exactly one host.",
             )
 
+    def save(self, *args, **kwargs):
+        self.instance.assigned_object = (
+            self.cleaned_data.get("device")
+            or self.cleaned_data.get("virtual_chassis")
+            or self.cleaned_data.get("virtual_machine")
+        )
+        return super().save(*args, **kwargs)
 
-class ACLExtendedRule(NetBoxModel):
-    """
-    Defines an Extended ACL rule.
-    """
 
-    access_list = models.ForeignKey(
-        to=AccessList,
-        on_delete=models.CASCADE,
-        related_name="aclextendedrules",
-        limit_choices_to={"type": ACLTypeChoices.TYPE_EXTENDED},
+class ACLInterfaceAssignmentForm(NetBoxModelForm):
+
+    device = DynamicModelChoiceField(
+        queryset=Device.objects.all(),
+        required=False,
     )
-    index = models.PositiveIntegerField(
-        verbose_name=_("Index"),
-        help_text=_("Determines the order of the rule in the ACL processing. AKA Sequence Number."),
+    interface = DynamicModelChoiceField(
+        queryset=Interface.objects.all(),
+        required=False,
+        query_params={"device_id": "$device"},
     )
-    action = models.CharField(
-        max_length=30,
-        choices=ACLRuleActionChoices,
-        verbose_name=_("Action"),
-        help_text=_("Action the rule will take (remark, deny, or allow)."),
+    virtual_machine = DynamicModelChoiceField(
+        queryset=VirtualMachine.objects.all(),
+        required=False,
+        label="Virtual Machine",
     )
-    remark = models.CharField(
-        max_length=500,
-        blank=True,
-        verbose_name=_("Remark"),
-    )
-    
-    # ИЗМЕНЕНО: ForeignKey заменен на CharField
-    source_prefix = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name=_("Source Prefix/Host"),
-        help_text=_("IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)"),
-    )
-    
-    # ИЗМЕНЕНО: ArrayField заменен на CharField
-    source_ports = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name=_("Source Ports"),
-        help_text=_("Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"),
-    )
-    
-    # ИЗМЕНЕНО: ForeignKey заменен на CharField
-    destination_prefix = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name=_("Destination Prefix/Host"),
-        help_text=_("IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)"),
-    )
-    
-    # ИЗМЕНЕНО: ArrayField заменен на CharField
-    destination_ports = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name=_("Destination Ports"),
-        help_text=_("Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"),
-    )
-    
-    protocol = models.CharField(
-        max_length=30,
-        choices=ACLProtocolChoices,
-        blank=True,
-        verbose_name=_("Protocol"),
-        help_text=_("IP protocol (e.g., tcp, udp, icmp, ip)."),
-    )
-    
-    description = models.CharField(
-        max_length=200,
-        blank=True,
-        verbose_name=_("Description"),
+    vminterface = DynamicModelChoiceField(
+        queryset=VMInterface.objects.all(),
+        required=False,
+        query_params={"virtual_machine_id": "$virtual_machine"},
+        label="VM Interface",
     )
 
-    objects = RestrictedQuerySet.as_manager()
+    access_list = DynamicModelChoiceField(
+        queryset=AccessList.objects.all(),
+        label="Access List",
+    )
+
+    comments = CommentField()
+
+    fieldsets = (
+        FieldSet("access_list", "direction", "tags", name=_("Access List Details")),
+        FieldSet(
+            TabbedGroups(
+                FieldSet("device", "interface", name=_("Device")),
+                FieldSet("virtual_machine", "vminterface", name=_("Virtual Machine")),
+            ),
+            name=_("Interface Assignment"),
+        ),
+    )
 
     class Meta:
-        ordering = ("access_list", "index")
-        unique_together = (
-            ("access_list", "index"),
+        model = ACLInterfaceAssignment
+        fields = (
+            "access_list",
+            "direction",
+            "device",
+            "interface",
+            "virtual_machine",
+            "vminterface",
+            "comments",
+            "tags",
         )
-        verbose_name = _("ACL Extended Rule")
-        verbose_name_plural = _("ACL Extended Rules")
-
-    def __str__(self):
-        return f"{self.access_list.name} - {self.index}: {self.action}"
-
-    def get_absolute_url(self):
-        return reverse("plugins:netbox_acls:aclextendedrule", args=[self.pk])
 
     def clean(self):
         super().clean()
 
-        if self.action == ACLRuleActionChoices.ACTION_REMARK:
-            fields_to_check = ["source_prefix", "source_ports", "destination_prefix", "destination_ports", "protocol"]
-            for field in fields_to_check:
-                if getattr(self, field):
-                    raise ValidationError(
-                        {field: _(f"Cannot set {field} when action is remark.")}
-                    )
+        interface = self.cleaned_data.get("interface")
+        vminterface = self.cleaned_data.get("vminterface")
 
-
-class ACLInterfaceAssignment(NetBoxModel):
-    """
-    Defines an ACL assignment to an interface.
-    """
-
-    assigned_object_type = models.ForeignKey(
-        to=ContentType,
-        on_delete=models.PROTECT,
-        related_name="+",
-        blank=True,
-        null=True,
-    )
-    assigned_object_id = models.PositiveIntegerField(
-        blank=True,
-        null=True,
-    )
-    assigned_object = GenericForeignKey(
-        ct_field="assigned_object_type",
-        fk_field="assigned_object_id",
-    )
-
-    access_list = models.ForeignKey(
-        to=AccessList,
-        on_delete=models.CASCADE,
-        related_name="interface_assignments",
-    )
-    direction = models.CharField(
-        max_length=30,
-        choices=ACLAssignmentDirectionChoices,
-        verbose_name=_("Direction"),
-        help_text=_("Direction the ACL is applied (ingress or egress)."),
-    )
-
-    objects = RestrictedQuerySet.as_manager()
-
-    class Meta:
-        ordering = ("access_list", "direction", "assigned_object_type", "assigned_object_id")
-        unique_together = (
-            ("assigned_object_type", "assigned_object_id", "access_list", "direction"),
-        )
-        verbose_name = _("ACL Interface Assignment")
-        verbose_name_plural = _("ACL Interface Assignments")
-
-    def __str__(self):
-        return f"{self.access_list} - {self.direction}"
-
-    def get_absolute_url(self):
-        return reverse("plugins:netbox_acls:aclinterfaceassignment", args=[self.pk])
-
-    @property
-    def interface(self):
-        from dcim.models import Interface
-
-        if isinstance(self.assigned_object, Interface):
-            return self.assigned_object
-        return None
-
-    @property
-    def vminterface(self):
-        from virtualization.models import VMInterface
-
-        if isinstance(self.assigned_object, VMInterface):
-            return self.assigned_object
-        return None
-
-    def clean(self):
-        super().clean()
-
-        # Check that the interface's parent host matches the ACL's host
-        if self.interface:
-            host = self.interface.device
-        elif self.vminterface:
-            host = self.vminterface.virtual_machine
-        else:
-            raise ValidationError(_("Must assign to either an Interface or VMInterface."))
-
-        if self.access_list.assigned_object != host:
+        if bool(interface) == bool(vminterface):
             raise ValidationError(
-                _("The ACL must be assigned to the same host as the interface.")
+                "Specify exactly one interface (physical or VM interface)."
             )
+
+    def save(self, *args, **kwargs):
+        self.instance.assigned_object = self.cleaned_data.get(
+            "interface"
+        ) or self.cleaned_data.get("vminterface")
+        return super().save(*args, **kwargs)
+
+
+class ACLStandardRuleForm(NetBoxModelForm):
+
+    access_list = DynamicModelChoiceField(
+        queryset=AccessList.objects.all(),
+        query_params={"type": ACLTypeChoices.TYPE_STANDARD},
+        label="Access List",
+    )
+
+    source_prefix = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Source Prefix",
+        help_text=help_text_acl_prefix,
+    )
+
+    fieldsets = (
+        FieldSet("access_list", "description", "tags", name=_("Access List Details")),
+        FieldSet(
+            "index",
+            "action",
+            "remark",
+            "source_prefix",
+            name=_("Rule Definition"),
+        ),
+    )
+
+    class Meta:
+        model = ACLStandardRule
+        fields = (
+            "access_list",
+            "index",
+            "action",
+            "remark",
+            "source_prefix",
+            "tags",
+            "description",
+        )
+
+
+class ACLExtendedRuleForm(NetBoxModelForm):
+
+    access_list = DynamicModelChoiceField(
+        queryset=AccessList.objects.all(),
+        query_params={"type": ACLTypeChoices.TYPE_EXTENDED},
+        label="Access List",
+    )
+
+    source_prefix = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Source Prefix",
+        help_text=help_text_acl_prefix,
+    )
+    source_ports = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Source Ports",
+        help_text=help_text_acl_ports,
+    )
+    destination_prefix = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Destination Prefix",
+        help_text=help_text_acl_prefix,
+    )
+    destination_ports = forms.CharField(
+        required=False,
+        max_length=100,
+        label="Destination Ports",
+        help_text=help_text_acl_ports,
+    )
+
+    fieldsets = (
+        FieldSet("access_list", "description", "tags", name=_("Access List Details")),
+        FieldSet(
+            "index",
+            "action",
+            "remark",
+            "source_prefix",
+            "source_ports",
+            "destination_prefix",
+            "destination_ports",
+            "protocol",
+            name=_("Rule Definition"),
+        ),
+    )
+
+    class Meta:
+        model = ACLExtendedRule
+        fields = (
+            "access_list",
+            "index",
+            "action",
+            "remark",
+            "source_prefix",
+            "source_ports",
+            "destination_prefix",
+            "destination_ports",
+            "protocol",
+            "tags",
+            "description",
+        )
