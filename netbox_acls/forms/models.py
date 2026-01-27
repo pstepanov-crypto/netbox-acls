@@ -511,16 +511,6 @@ class ACLStandardRuleForm(NetBoxModelForm):
         label="Source Prefix/Host",
         help_text=help_text_acl_prefix,
     )
-    # Добавлено: поле для устройства-источника
-    source_device = DynamicModelChoiceField(
-        queryset=Device.objects.all(),
-        required=False,
-        help_text=help_text_acl_device_logic,
-        label="Source Device",
-        query_params={
-            'has_primary_ip': 'True',  # Только устройства с IP
-        }
-    )
 
     fieldsets = (
         FieldSet(
@@ -534,7 +524,6 @@ class ACLStandardRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
-            "source_device",  # Добавлено
             name=_("Rule Definition"),
         ),
     )
@@ -547,7 +536,6 @@ class ACLStandardRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
-            "source_device",  # Добавлено
             "tags",
             "description",
         )
@@ -566,15 +554,6 @@ class ACLStandardRuleForm(NetBoxModelForm):
         Validate that both source_device and source_prefix are not set at the same time.
         """
         super().clean()
-        
-        source_device = self.cleaned_data.get("source_device")
-        source_prefix = self.cleaned_data.get("source_prefix")
-        
-        if source_device and source_prefix:
-            raise ValidationError({
-                "source_device": "Cannot set both Source Device and Source Prefix.",
-                "source_prefix": "Cannot set both Source Device and Source Prefix."
-            })
 
 
 class ACLExtendedRuleForm(NetBoxModelForm):
@@ -602,16 +581,7 @@ class ACLExtendedRuleForm(NetBoxModelForm):
         label="Source Prefix/Host",
         help_text=help_text_acl_prefix,
     )
-    # Добавлено: поле для устройства-источника
-    source_device = DynamicModelChoiceField(
-        queryset=Device.objects.all(),
-        required=False,
-        help_text=help_text_acl_device_logic,
-        label="Source Device",
-        query_params={
-            'has_primary_ip': 'True',  # Только устройства с IP
-        }
-    )
+    
     # ИЗМЕНЕНО: CharField вместо ArrayField для поддержки диапазонов
     source_ports = forms.CharField(
         required=False,
@@ -626,16 +596,7 @@ class ACLExtendedRuleForm(NetBoxModelForm):
         label="Destination Prefix/Host",
         help_text=help_text_acl_prefix,
     )
-    # Добавлено: поле для устройства-назначения
-    destination_device = DynamicModelChoiceField(
-        queryset=Device.objects.all(),
-        required=False,
-        help_text=help_text_acl_device_logic,
-        label="Destination Device",
-        query_params={
-            'has_primary_ip': 'True',  # Только устройства с IP
-        }
-    )
+
     # ИЗМЕНЕНО: CharField вместо ArrayField для поддержки диапазонов
     destination_ports = forms.CharField(
         required=False,
@@ -656,10 +617,8 @@ class ACLExtendedRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
-            "source_device",        # Добавлено
             "source_ports",
             "destination_prefix",
-            "destination_device",   # Добавлено
             "destination_ports",
             "protocol",
             name=_("Rule Definition"),
@@ -674,10 +633,8 @@ class ACLExtendedRuleForm(NetBoxModelForm):
             "action",
             "remark",
             "source_prefix",
-            "source_device",        # Добавлено
             "source_ports",
             "destination_prefix",
-            "destination_device",   # Добавлено
             "destination_ports",
             "protocol",
             "tags",
@@ -693,30 +650,24 @@ class ACLExtendedRuleForm(NetBoxModelForm):
                 "<b>*Note:</b> CANNOT be set if action is not set to remark.",
             ),
             "source_ports": help_text_acl_rule_logic,
-            "source_device": help_text_acl_device_logic,
-            "destination_device": help_text_acl_device_logic,
         }
 
     def clean(self):
         """
-        Validate that both source_device/source_prefix and destination_device/destination_prefix 
+        Validate that both source_device/source_prefix
         are not set at the same time.
         """
         super().clean()
         
-        source_device = self.cleaned_data.get("source_device")
         source_prefix = self.cleaned_data.get("source_prefix")
-        destination_device = self.cleaned_data.get("destination_device")
         destination_prefix = self.cleaned_data.get("destination_prefix")
         
         errors = {}
         
         if source_device and source_prefix:
-            errors["source_device"] = "Cannot set both Source Device and Source Prefix."
             errors["source_prefix"] = "Cannot set both Source Device and Source Prefix."
             
         if destination_device and destination_prefix:
-            errors["destination_device"] = "Cannot set both Destination Device and Destination Prefix."
             errors["destination_prefix"] = "Cannot set both Destination Device and Destination Prefix."
             
         if errors:
