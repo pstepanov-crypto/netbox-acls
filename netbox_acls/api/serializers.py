@@ -216,19 +216,6 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
         max_length=100,
         help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
-    # Добавлено: сериализатор для устройства-источника
-    source_device = DeviceSerializer(
-        nested=True,
-        required=False,
-        allow_null=True,
-        default=None,
-    )
-    # Добавлено: IP-адрес устройства-источника
-    source_device_ip = serializers.SerializerMethodField(
-        required=False,
-        allow_null=True,
-        read_only=True,
-    )
 
     class Meta:
         """
@@ -245,8 +232,6 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
             "action",
             "remark",
             "source_prefix",
-            "source_device",  # Добавлено
-            "source_device_ip",  # Добавлено
             "description",
             "tags",
             "created",
@@ -275,7 +260,6 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
 
         # Check if both source_device and source_prefix are set.
         if data.get("source_device") and data.get("source_prefix"):
-            error_message["source_device"] = [error_message_source_device_and_prefix]
             error_message["source_prefix"] = [error_message_source_device_and_prefix]
 
         if data.get("action") == "remark":
@@ -317,19 +301,7 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         max_length=100,
         help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
-    # Добавлено: сериализатор для устройства-источника
-    source_device = DeviceSerializer(
-        nested=True,
-        required=False,
-        allow_null=True,
-        default=None,
-    )
-    # Добавлено: IP-адрес устройства-источника
-    source_device_ip = serializers.SerializerMethodField(
-        required=False,
-        allow_null=True,
-        read_only=True,
-    )
+
     # ИЗМЕНЕНО: CharField вместо ListField для поддержки диапазонов
     source_ports = serializers.CharField(
         required=False,
@@ -344,19 +316,7 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         max_length=100,
         help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
-    # Добавлено: сериализатор для устройства-назначения
-    destination_device = DeviceSerializer(
-        nested=True,
-        required=False,
-        allow_null=True,
-        default=None,
-    )
-    # Добавлено: IP-адрес устройства-назначения
-    destination_device_ip = serializers.SerializerMethodField(
-        required=False,
-        allow_null=True,
-        read_only=True,
-    )
+    
     # ИЗМЕНЕНО: CharField вместо ListField для поддержки диапазонов
     destination_ports = serializers.CharField(
         required=False,
@@ -381,12 +341,8 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
             "remark",
             "protocol",
             "source_prefix",
-            "source_device",        # Добавлено
-            "source_device_ip",     # Добавлено
             "source_ports",
             "destination_prefix",
-            "destination_device",   # Добавлено
-            "destination_device_ip", # Добавлено
             "destination_ports",
             "description",
             "tags",
@@ -423,19 +379,15 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
           - Check if action set to remark, but destination_prefix set.
           - Check if action set to remark, but destination_ports set.
           - Check if action set to remark, but protocol set.
-          - Check if both source_device and source_prefix are set.
-          - Check if both destination_device and destination_prefix are set.
         """
         error_message = {}
 
         # Check if both source_device and source_prefix are set.
         if data.get("source_device") and data.get("source_prefix"):
-            error_message["source_device"] = [error_message_source_device_and_prefix]
             error_message["source_prefix"] = [error_message_source_device_and_prefix]
 
         # Check if both destination_device and destination_prefix are set.
         if data.get("destination_device") and data.get("destination_prefix"):
-            error_message["destination_device"] = [error_message_destination_device_and_prefix]
             error_message["destination_prefix"] = [error_message_destination_device_and_prefix]
 
         if data.get("action") == "remark":
@@ -449,11 +401,6 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
                 error_message["source_prefix"] = [
                     error_message_action_remark_source_prefix_set,
                 ]
-            # Check if action set to remark, but source_device set.
-            if data.get("source_device"):
-                error_message["source_device"] = [
-                    "Action is set to remark, Source Device CANNOT be set.",
-                ]
             # Check if action set to remark, but source_ports set.
             if data.get("source_ports"):
                 error_message["source_ports"] = [
@@ -463,11 +410,6 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
             if data.get("destination_prefix"):
                 error_message["destination_prefix"] = [
                     "Action is set to remark, Destination Prefix CANNOT be set.",
-                ]
-            # Check if action set to remark, but destination_device set.
-            if data.get("destination_device"):
-                error_message["destination_device"] = [
-                    "Action is set to remark, Destination Device CANNOT be set.",
                 ]
             # Check if action set to remark, but destination_ports set.
             if data.get("destination_ports"):
