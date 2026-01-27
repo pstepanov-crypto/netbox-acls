@@ -119,15 +119,6 @@ class ACLRule(NetBoxModel):
         Validate common ACL Rule inputs for both standard and extended rules.
         """
         super().clean()
-        errors = {}
-
-        # Validate that both source_device and source_prefix are not set at the same time
-        if self.source_device and self.source_prefix:
-            errors["source_device"] = ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX
-            errors["source_prefix"] = ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX
-
-        if errors:
-            raise ValidationError(errors)
 
 
 class ACLStandardRule(ACLRule):
