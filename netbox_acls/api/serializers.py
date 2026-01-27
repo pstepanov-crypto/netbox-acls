@@ -209,11 +209,12 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
         view_name="plugins-api:netbox_acls-api:aclstandardrule-detail",
     )
     access_list = AccessListSerializer(nested=True, required=True)
-    source_prefix = PrefixSerializer(
-        nested=True,
+    # ИЗМЕНЕНО: CharField вместо PrefixSerializer
+    source_prefix = serializers.CharField(
         required=False,
-        allow_null=True,
-        default=None,
+        allow_blank=True,
+        max_length=100,
+        help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
     # Добавлено: сериализатор для устройства-источника
     source_device = DeviceSerializer(
@@ -309,11 +310,12 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         view_name="plugins-api:netbox_acls-api:aclextendedrule-detail",
     )
     access_list = AccessListSerializer(nested=True, required=True)
-    source_prefix = PrefixSerializer(
-        nested=True,
+    # ИЗМЕНЕНО: CharField вместо PrefixSerializer
+    source_prefix = serializers.CharField(
         required=False,
-        allow_null=True,
-        default=None,
+        allow_blank=True,
+        max_length=100,
+        help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
     # Добавлено: сериализатор для устройства-источника
     source_device = DeviceSerializer(
@@ -335,11 +337,12 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         max_length=100,
         help_text="Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)",
     )
-    destination_prefix = PrefixSerializer(
-        nested=True,
+    # ИЗМЕНЕНО: CharField вместо PrefixSerializer
+    destination_prefix = serializers.CharField(
         required=False,
-        allow_null=True,
-        default=None,
+        allow_blank=True,
+        max_length=100,
+        help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
     # Добавлено: сериализатор для устройства-назначения
     destination_device = DeviceSerializer(
