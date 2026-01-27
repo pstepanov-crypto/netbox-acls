@@ -49,6 +49,8 @@ help_text_acl_device_logic = mark_safe(
 )
 # Sets a standard help_text value to be used for port fields
 help_text_acl_ports = "Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"
+# Sets a standard help_text value to be used for prefix fields
+help_text_acl_prefix = "IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)"
 
 
 class AccessListForm(NetBoxModelForm):
@@ -502,11 +504,12 @@ class ACLStandardRuleForm(NetBoxModelForm):
         ),
         label="Access List",
     )
-    source_prefix = DynamicModelChoiceField(
-        queryset=Prefix.objects.all(),
+    # ИЗМЕНЕНО: CharField вместо DynamicModelChoiceField
+    source_prefix = forms.CharField(
         required=False,
-        help_text=help_text_acl_rule_logic,
+        max_length=100,
         label="Source Prefix",
+        help_text=help_text_acl_prefix,
     )
     # Добавлено: поле для устройства-источника
     source_device = DynamicModelChoiceField(
@@ -592,11 +595,12 @@ class ACLExtendedRuleForm(NetBoxModelForm):
         label="Access List",
     )
 
-    source_prefix = DynamicModelChoiceField(
-        queryset=Prefix.objects.all(),
+    # ИЗМЕНЕНО: CharField вместо DynamicModelChoiceField
+    source_prefix = forms.CharField(
         required=False,
-        help_text=help_text_acl_rule_logic,
+        max_length=100,
         label="Source Prefix",
+        help_text=help_text_acl_prefix,
     )
     # Добавлено: поле для устройства-источника
     source_device = DynamicModelChoiceField(
@@ -615,11 +619,12 @@ class ACLExtendedRuleForm(NetBoxModelForm):
         label="Source Ports",
         help_text=help_text_acl_ports,
     )
-    destination_prefix = DynamicModelChoiceField(
-        queryset=Prefix.objects.all(),
+    # ИЗМЕНЕНО: CharField вместо DynamicModelChoiceField
+    destination_prefix = forms.CharField(
         required=False,
-        help_text=help_text_acl_rule_logic,
+        max_length=100,
         label="Destination Prefix",
+        help_text=help_text_acl_prefix,
     )
     # Добавлено: поле для устройства-назначения
     destination_device = DynamicModelChoiceField(
