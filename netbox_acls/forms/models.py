@@ -508,7 +508,7 @@ class ACLStandardRuleForm(NetBoxModelForm):
     source_prefix = forms.CharField(
         required=False,
         max_length=100,
-        label="Source Prefix",
+        label="Source Prefix/Host",
         help_text=help_text_acl_prefix,
     )
     # Добавлено: поле для устройства-источника
@@ -599,7 +599,7 @@ class ACLExtendedRuleForm(NetBoxModelForm):
     source_prefix = forms.CharField(
         required=False,
         max_length=100,
-        label="Source Prefix",
+        label="Source Prefix/Host",
         help_text=help_text_acl_prefix,
     )
     # Добавлено: поле для устройства-источника
@@ -623,7 +623,7 @@ class ACLExtendedRuleForm(NetBoxModelForm):
     destination_prefix = forms.CharField(
         required=False,
         max_length=100,
-        label="Destination Prefix",
+        label="Destination Prefix/Host",
         help_text=help_text_acl_prefix,
     )
     # Добавлено: поле для устройства-назначения
