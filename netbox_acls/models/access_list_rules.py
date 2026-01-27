@@ -82,17 +82,8 @@ class ACLRule(NetBoxModel):
         blank=True,
         help_text=_("IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)"),
     )
-    # Добавлено: поле для устройства-источника
-    source_device = models.ForeignKey(
-        to="dcim.Device",
-        on_delete=models.PROTECT,
-        related_name="+",
-        verbose_name=_("Source Device"),
-        blank=True,
-        null=True,
-    )
 
-    clone_fields = ("access_list", "action", "source_prefix", "source_device")
+    clone_fields = ("access_list", "action", "source_prefix")
     prerequisite_models = ("netbox_acls.AccessList",)
 
     class Meta:
