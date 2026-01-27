@@ -3,7 +3,6 @@ Define the django models for this plugin.
 """
 
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ValidationError
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
@@ -76,13 +75,12 @@ class ACLRule(NetBoxModel):
         max_length=30,
         choices=ACLRuleActionChoices,
     )
-    source_prefix = models.ForeignKey(
-        to="ipam.prefix",
-        on_delete=models.PROTECT,
-        related_name="+",
-        verbose_name=_("Source Prefix"),
+    # ИЗМЕНЕНО: CharField вместо ForeignKey для поддержки любых форматов
+    source_prefix = models.CharField(
+        verbose_name=_("Source Prefix/Host"),
+        max_length=100,
         blank=True,
-        null=True,
+        help_text=_("IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)"),
     )
     # Добавлено: поле для устройства-источника
     source_device = models.ForeignKey(
@@ -206,18 +204,19 @@ class ACLExtendedRule(ACLRule):
         limit_choices_to={"type": "extended"},
         verbose_name=_("Extended Access List"),
     )
+    # ИЗМЕНЕНО: CharField для поддержки диапазонов портов
     source_ports = models.CharField(
         verbose_name=_("Source Ports"),
         max_length=100,
         blank=True,
+        help_text=_("Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"),
     )
-    destination_prefix = models.ForeignKey(
-        to="ipam.prefix",
-        on_delete=models.PROTECT,
-        related_name="+",
-        verbose_name=_("Destination Prefix"),
+    # ИЗМЕНЕНО: CharField вместо ForeignKey для поддержки любых форматов
+    destination_prefix = models.CharField(
+        verbose_name=_("Destination Prefix/Host"),
+        max_length=100,
         blank=True,
-        null=True,
+        help_text=_("IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)"),
     )
     # Добавлено: поле для устройства-назначения
     destination_device = models.ForeignKey(
@@ -228,10 +227,12 @@ class ACLExtendedRule(ACLRule):
         blank=True,
         null=True,
     )
+    # ИЗМЕНЕНО: CharField для поддержки диапазонов портов
     destination_ports = models.CharField(
         verbose_name=_("Destination Ports"),
         max_length=100,
         blank=True,
+        help_text=_("Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)"),
     )
     protocol = models.CharField(
         verbose_name=_("Protocol"),
