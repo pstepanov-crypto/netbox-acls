@@ -324,7 +324,6 @@ class ACLStandardRuleView(generic.ObjectView):
     queryset = models.ACLStandardRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
     )
 
 
@@ -337,7 +336,6 @@ class ACLStandardRuleListView(generic.ObjectListView):
     queryset = models.ACLStandardRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
     )
     table = tables.ACLStandardRuleTable
     filterset = filtersets.ACLStandardRuleFilterSet
@@ -354,7 +352,6 @@ class ACLStandardRuleEditView(generic.ObjectEditView):
     queryset = models.ACLStandardRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
     )
     form = forms.ACLStandardRuleForm
 
@@ -377,7 +374,6 @@ class ACLStandardRuleDeleteView(generic.ObjectDeleteView):
     queryset = models.ACLStandardRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
     )
 
 
@@ -386,7 +382,6 @@ class ACLStandardRuleBulkDeleteView(generic.BulkDeleteView):
     queryset = models.ACLStandardRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
     )
     filterset = filtersets.ACLStandardRuleFilterSet
     table = tables.ACLStandardRuleTable
@@ -406,8 +401,6 @@ class ACLExtendedRuleView(generic.ObjectView):
     queryset = models.ACLExtendedRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
-        "destination_prefix",
     )
 
 
@@ -420,8 +413,6 @@ class ACLExtendedRuleListView(generic.ObjectListView):
     queryset = models.ACLExtendedRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
-        "destination_prefix",
     )
     table = tables.ACLExtendedRuleTable
     filterset = filtersets.ACLExtendedRuleFilterSet
@@ -438,8 +429,6 @@ class ACLExtendedRuleEditView(generic.ObjectEditView):
     queryset = models.ACLExtendedRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
-        "destination_prefix",
     )
     form = forms.ACLExtendedRuleForm
 
@@ -462,8 +451,6 @@ class ACLExtendedRuleDeleteView(generic.ObjectDeleteView):
     queryset = models.ACLExtendedRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
-        "destination_prefix",
     )
 
 
@@ -472,8 +459,6 @@ class ACLExtendedRuleBulkDeleteView(generic.BulkDeleteView):
     queryset = models.ACLExtendedRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
-        "destination_prefix",
     )
     filterset = filtersets.ACLExtendedRuleFilterSet
     table = tables.ACLExtendedRuleTable
