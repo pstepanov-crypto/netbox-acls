@@ -252,10 +252,6 @@ class ACLExtendedRule(ACLRule):
         super().clean()
         errors = {}
 
-        # Validate that both destination_device and destination_prefix are not set at the same time
-        if self.destination_device and self.destination_prefix:
-            errors["destination_prefix"] = ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX
-
         # Validate that only the remark field is filled
         if self.action == ACLRuleActionChoices.ACTION_REMARK:
             if not self.remark:
