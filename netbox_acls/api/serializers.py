@@ -209,7 +209,6 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
         view_name="plugins-api:netbox_acls-api:aclstandardrule-detail",
     )
     access_list = AccessListSerializer(nested=True, required=True)
-    # ИЗМЕНЕНО: CharField вместо PrefixSerializer
     source_prefix = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -240,27 +239,13 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
         )
         brief_fields = ("id", "url", "display", "access_list", "index")
 
-    @extend_schema_field(serializers.CharField(allow_null=True))
-    def get_source_device_ip(self, obj):
-        """
-        Returns the primary IP address of the source device.
-        """
-        if obj.source_device and obj.source_device.primary_ip:
-            return str(obj.source_device.primary_ip.address.ip)
-        return None
-
     def validate(self, data):
         """
         Validate the ACLStandardRule django model's inputs before allowing it to update the instance:
           - Check if action set to remark, but no remark set.
           - Check if action set to remark, but source_prefix set.
-          - Check if both source_device and source_prefix are set.
         """
         error_message = {}
-
-        # Check if both source_device and source_prefix are set.
-        if data.get("source_device") and data.get("source_prefix"):
-            error_message["source_prefix"] = [error_message_source_device_and_prefix]
 
         if data.get("action") == "remark":
             # Check if action set to remark, but no remark set.
@@ -272,11 +257,6 @@ class ACLStandardRuleSerializer(NetBoxModelSerializer):
             if data.get("source_prefix"):
                 error_message["source_prefix"] = [
                     error_message_action_remark_source_prefix_set,
-                ]
-            # Check if action set to remark, but source_device set.
-            if data.get("source_device"):
-                error_message["source_device"] = [
-                    "Action is set to remark, Source Device CANNOT be set.",
                 ]
 
         if error_message:
@@ -294,7 +274,6 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         view_name="plugins-api:netbox_acls-api:aclextendedrule-detail",
     )
     access_list = AccessListSerializer(nested=True, required=True)
-    # ИЗМЕНЕНО: CharField вместо PrefixSerializer
     source_prefix = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -302,14 +281,13 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
 
-    # ИЗМЕНЕНО: CharField вместо ListField для поддержки диапазонов
     source_ports = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=100,
         help_text="Port numbers or ranges (e.g., 80, 443, 1000-2000, eq www, range 445 1050)",
     )
-    # ИЗМЕНЕНО: CharField вместо PrefixSerializer
+    
     destination_prefix = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -317,7 +295,6 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         help_text="IP prefix, network or host (e.g., 192.168.1.0/24, 192.168.1.0 255.255.255.0, host 10.1.1.1)",
     )
     
-    # ИЗМЕНЕНО: CharField вместо ListField для поддержки диапазонов
     destination_ports = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -352,24 +329,6 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
         )
         brief_fields = ("id", "url", "display", "access_list", "index")
 
-    @extend_schema_field(serializers.CharField(allow_null=True))
-    def get_source_device_ip(self, obj):
-        """
-        Returns the primary IP address of the source device.
-        """
-        if obj.source_device and obj.source_device.primary_ip:
-            return str(obj.source_device.primary_ip.address.ip)
-        return None
-
-    @extend_schema_field(serializers.CharField(allow_null=True))
-    def get_destination_device_ip(self, obj):
-        """
-        Returns the primary IP address of the destination device.
-        """
-        if obj.destination_device and obj.destination_device.primary_ip:
-            return str(obj.destination_device.primary_ip.address.ip)
-        return None
-
     def validate(self, data):
         """
         Validate the ACLExtendedRule django model's inputs before allowing it to update the instance:
@@ -381,14 +340,6 @@ class ACLExtendedRuleSerializer(NetBoxModelSerializer):
           - Check if action set to remark, but protocol set.
         """
         error_message = {}
-
-        # Check if both source_device and source_prefix are set.
-        if data.get("source_device") and data.get("source_prefix"):
-            error_message["source_prefix"] = [error_message_source_device_and_prefix]
-
-        # Check if both destination_device and destination_prefix are set.
-        if data.get("destination_device") and data.get("destination_prefix"):
-            error_message["destination_prefix"] = [error_message_destination_device_and_prefix]
 
         if data.get("action") == "remark":
             # Check if action set to remark, but no remark set.
