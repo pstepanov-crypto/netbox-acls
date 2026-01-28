@@ -60,7 +60,6 @@ class ACLStandardRuleViewSet(NetBoxModelViewSet):
     queryset = models.ACLStandardRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
     )
     serializer_class = ACLStandardRuleSerializer
     filterset_class = filtersets.ACLStandardRuleFilterSet
@@ -74,8 +73,6 @@ class ACLExtendedRuleViewSet(NetBoxModelViewSet):
     queryset = models.ACLExtendedRule.objects.prefetch_related(
         "access_list",
         "tags",
-        "source_prefix",
-        "destination_prefix",
     )
     serializer_class = ACLExtendedRuleSerializer
     filterset_class = filtersets.ACLExtendedRuleFilterSet
