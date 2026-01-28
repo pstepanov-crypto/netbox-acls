@@ -40,12 +40,6 @@ ERROR_MESSAGE_ACTION_REMARK_PROTOCOL_SET = _("When the action is 'remark', Proto
 # Error message when a remark is provided, but the action is not set to 'remark'.
 ERROR_MESSAGE_REMARK_WITHOUT_ACTION_REMARK = _("A remark cannot be set unless the action is 'remark'.")
 
-# Error message when both source_device and source_prefix are set.
-ERROR_MESSAGE_SOURCE_DEVICE_AND_PREFIX = _("Cannot set both Source Device and Source Prefix.")
-
-# Error message when both destination_device and destination_prefix are set.
-ERROR_MESSAGE_DESTINATION_DEVICE_AND_PREFIX = _("Cannot set both Destination Device and Destination Prefix.")
-
 
 class ACLRule(NetBoxModel):
     """
@@ -163,8 +157,6 @@ class ACLStandardRule(ACLRule):
                 errors["remark"] = ERROR_MESSAGE_NO_REMARK
             if self.source_prefix:
                 errors["source_prefix"] = ERROR_MESSAGE_ACTION_REMARK_SOURCE_PREFIX_SET
-            if self.source_device:
-                errors["source_device"] = _("When the action is 'remark', Source Device must not be set.")
         # Validate that the action is "remark", when the remark field is provided
         elif self.remark:
             errors["remark"] = ERROR_MESSAGE_REMARK_WITHOUT_ACTION_REMARK
