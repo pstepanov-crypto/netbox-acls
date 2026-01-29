@@ -10,7 +10,6 @@ __all__ = (
     "ACLProtocolChoices",
     "ACLRuleActionChoices",
     "ACLTypeChoices",
-    "ACLProtocolChoices",
 )
 
 
@@ -79,11 +78,13 @@ class ACLProtocolChoices(ChoiceSet):
     Defines the choices availble for the Access Lists plugin specific to ACL Rule protocol.
     """
 
+    PROTOCOL_IP = "ip"
     PROTOCOL_ICMP = "icmp"
     PROTOCOL_TCP = "tcp"
     PROTOCOL_UDP = "udp"
 
     CHOICES = [
+        (PROTOCOL_IP, "IP", "green"),
         (PROTOCOL_ICMP, "ICMP", "purple"),
         (PROTOCOL_TCP, "TCP", "blue"),
         (PROTOCOL_UDP, "UDP", "orange"),
