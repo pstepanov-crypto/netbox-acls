@@ -1,5 +1,6 @@
 # NetBox Access Lists Plugin / Fork
 + change type of source/destination ports/prefix (ability to create range ports, and etc.)
++ add host ip (for dynamic hosts Ansible AWX) inside API of module
 
 
 ## Features
